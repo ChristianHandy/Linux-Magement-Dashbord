@@ -1,5 +1,5 @@
 from flask import Flask, render_template, redirect, session, request
-import json, threading, paramiko
+import json, threading, paramiko, os
 from updater import run_update
 import scheduler
 
@@ -31,6 +31,32 @@ def load_hosts():
 def save_hosts(hosts):
     with open("hosts.json", "w") as f:
         json.dump(hosts, f, indent=2)
+
+def get_local_public_key():
+    """
+    Return the local public key string. Generate a new keypair if needed.
+    """
+    ssh_dir = os.path.expanduser("~/.ssh")
+    pub_path = os.path.join(ssh_dir, "id_rsa.pub")
+    priv_path = os.path.join(ssh_dir, "id_rsa")
+
+    try:
+        if os.path.exists(pub_path):
+            with open(pub_path, "r") as f:
+                return f.read().strip()
+        # generate new keypair
+        os.makedirs(ssh_dir, exist_ok=True)
+        key = paramiko.RSAKey.generate(2048)
+        # write private key
+        key.write_private_key_file(priv_path)
+        with open(pub_path, "w") as f:
+            f.write(f"{key.get_name()} {key.get_base64()}\n")
+        os.chmod(priv_path, 0o600)
+        os.chmod(pub_path, 0o644)
+        with open(pub_path, "r") as f:
+            return f.read().strip()
+    except Exception as e:
+        raise RuntimeError(f"Failed to obtain or generate local SSH key: {e}")
 
 @app.route("/", methods=["GET", "POST"])
 def login():
@@ -112,6 +138,45 @@ def delete_host(name):
         hosts.pop(name)
         save_hosts(hosts)
     return redirect("/hosts")
+
+# NEW: Install SSH public key on remote host using password auth
+@app.route("/hosts/install_key/<name>", methods=["GET", "POST"])
+def install_key(name):
+    if not session.get("login"):
+        return redirect("/")
+    hosts = load_hosts()
+    if name not in hosts:
+        return redirect("/hosts")
+    error = None
+    success = False
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        try:
+            pubkey = get_local_public_key()
+        except Exception as e:
+            error = str(e)
+            return render_template("install_key.html", name=name, error=error, success=False)
+
+        target = hosts[name]
+        try:
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(target["host"], username=target["user"], password=password, timeout=10)
+            safe_key = pubkey.replace('\"', '\\\"')
+            cmd = (
+                'mkdir -p ~/.ssh && chmod 700 ~/.ssh && '
+                f'echo "{safe_key}" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'
+            )
+            stdin, stdout, stderr = ssh.exec_command(cmd)
+            err = stderr.read().decode().strip()
+            ssh.close()
+            if err:
+                error = f"Remote error: {err}"
+            else:
+                success = True
+        except Exception as e:
+            error = f"Connection error: {e}"
+    return render_template("install_key.html", name=name, error=error, success=success)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

@@ -1,0 +1,29 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/static/style.css">
+
+<div class="container">
+  <h2>Install SSH key on {{ name }}</h2>
+  <p><a class="btn" href="/hosts">Back to Hosts</a></p>
+
+  {% if error %}
+    <div class="card">
+      <b>Error</b><br>
+      <pre>{{ error }}</pre>
+    </div>
+  {% endif %}
+
+  {% if success %}
+    <div class="card">
+      <b>Success</b><br>
+      Public key installed into ~/.ssh/authorized_keys on the remote host.
+    </div>
+  {% else %}
+    <div class="card">
+      <form method="post">
+        <label>Remote account password for {{ name }}</label><br>
+        <input name="password" type="password" placeholder="Password"><br><br>
+        <button class="btn" type="submit">Install Key</button>
+      </form>
+    </div>
+  {% endif %}
+</div>

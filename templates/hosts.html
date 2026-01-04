@@ -13,6 +13,7 @@
         Host: {{ h.host }}<br>
         User: {{ h.user }}<br><br>
         <a class="btn" href="/hosts/edit/{{ name }}">Edit</a>
+        <a class="btn" href="/hosts/install_key/{{ name }}">Install SSH key</a>
         <form action="/hosts/delete/{{ name }}" method="post" style="display:inline">
           <button class="btn" type="submit">Delete</button>
         </form>
