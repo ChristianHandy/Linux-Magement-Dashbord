@@ -1,0 +1,17 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/static/style.css">
+
+<div class="container">
+  <h2>Edit Host: {{ name }}</h2>
+  <p><a class="btn" href="/hosts">Back to Hosts</a></p>
+
+  <form method="post" class="card">
+    <label>Display name</label><br>
+    <input name="name" value="{{ name }}"><br><br>
+    <label>Host (IP or hostname)</label><br>
+    <input name="host" value="{{ data.host }}"><br><br>
+    <label>User</label><br>
+    <input name="user" value="{{ data.user }}"><br><br>
+    <button class="btn" type="submit">Save</button>
+  </form>
+</div>

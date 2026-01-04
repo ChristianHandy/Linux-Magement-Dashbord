@@ -1,0 +1,35 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/static/style.css">
+
+<div class="container">
+  <h2>Manage Hosts</h2>
+  <p><a class="btn" href="/dashboard">Back to Dashboard</a></p>
+
+  <h3>Existing Hosts</h3>
+  {% if hosts %}
+    {% for name, h in hosts.items() %}
+      <div class="card">
+        <b>{{ name }}</b><br>
+        Host: {{ h.host }}<br>
+        User: {{ h.user }}<br><br>
+        <a class="btn" href="/hosts/edit/{{ name }}">Edit</a>
+        <form action="/hosts/delete/{{ name }}" method="post" style="display:inline">
+          <button class="btn" type="submit">Delete</button>
+        </form>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p>No hosts configured yet.</p>
+  {% endif %}
+
+  <h3>Add / Update Host</h3>
+  <form method="post" class="card">
+    <label>Display name</label><br>
+    <input name="name" placeholder="Friendly name"><br><br>
+    <label>Host (IP or hostname)</label><br>
+    <input name="host" placeholder="192.168.1.100"><br><br>
+    <label>User</label><br>
+    <input name="user" placeholder="username"><br><br>
+    <button class="btn" type="submit">Save</button>
+  </form>
+</div>

@@ -1,9 +1,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="/static/style.css">
 
-<!-- Fixes #1 -->
 <div class="container">
 <h2>Linux Update Dashboard</h2>
+
+<p><a class="btn" href="/hosts">Manage Hosts</a></p>
 
 {% for name in hosts %}
 <div class="card">
@@ -13,6 +14,7 @@
     {{ 'Online' if status[name] else 'Offline' }}
   </span><br><br>
   <a class="btn" href="/update/{{ name }}">Update</a>
+  <a class="btn" href="/hosts/edit/{{ name }}">Edit</a>
 </div>
 {% endfor %}
 
