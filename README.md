@@ -1,21 +1,44 @@
-# Linux Update Dashboard
+# Linux Management Dashboard
 
-A mobile-friendly web dashboard to monitor and update multiple Linux computers from one interface.
+A comprehensive web dashboard combining system update management and disk tools for Linux computers.
 
 ## Features
-- Trigger updates remotely
+
+### System Update Manager
+- Trigger updates remotely on multiple Linux computers via SSH
 - Mobile-friendly UI
-- Update history
-- Online/offline detection
+- Update history tracking
+- Online/offline host detection
 - Auto-scheduled updates
+- SSH key management
+
+### Disk Management Tools
+- Format disks (ext4, XFS, FAT32)
+- SMART health monitoring (short/long tests)
+- Block validation and error detection
+- Disk history and operations tracking
+- Remote disk management
+- Automatic disk detection and processing
+- Plugin/addon system for extensibility
+- CSV export/import of SMART data
 
 ## Installation
-1. Clone repository: `git clone https://github.com/YOUR_USERNAME/linux-update-dashboard.git`
+1. Clone repository: `git clone https://github.com/ChristianHandy/linux-update-dashboard.git`
 2. Enter project: `cd linux-update-dashboard`
 3. Create virtual env: `python3 -m venv venv`
 4. Activate: `source venv/bin/activate`
 5. Install requirements: `pip install -r requirements.txt`
-6. Run: `python app.py`
+6. Run: `python app.py` (requires sudo for disk management features)
+
+## Usage
+
+The dashboard provides two main tools accessible from the main menu:
+
+### System Update Manager (`/dashboard`)
+Monitor and update remote Linux systems via SSH. See "Managing hosts" section below for details.
+
+### Disk Management Tools (`/disks`)
+Format, test, and monitor disk drives. Requires root/sudo privileges for disk operations.
 
 ## Managing hosts (via web UI)
 
@@ -93,6 +116,81 @@ Running & testing
 4. Log in and visit `/hosts` to manage hosts.
 
 Troubleshooting
-- Template errors: ensure `templates/` contains `dashboard.html`, `hosts.html`, `edit_host.html`, `install_key.html`, and `progress.html`.
+- Template errors: ensure `templates/` contains all required template files
 - If `hosts.json` is malformed, the app will fall back to an empty hosts list. Check JSON syntax if hosts are missing.
 - If SSH key installation fails, examine the error message shown on the `/hosts/install_key/<name>` page and check connectivity and credentials.
+
+## Disk Management Tools
+
+The Disk Tools section (`/disks`) provides comprehensive disk management capabilities.
+
+### Prerequisites for Disk Tools
+- Linux system with Python 3.8+
+- Root/sudo privileges for disk operations
+- System utilities: `lsblk`, `smartctl`, `wipefs`, `mkfs.ext4`, `mkfs.xfs`, `mkfs.vfat`, `dd`, `badblocks`
+
+Install required tools:
+```bash
+sudo apt update
+sudo apt install smartmontools parted e2fsprogs xfsprogs dosfstools
+```
+
+### Disk Tools Features
+
+**Disk Overview** (`/disks`)
+- Lists all connected disks with model, size, and serial information
+- Search/filter disks by device name or model
+- Real-time disk usage monitoring
+
+**SMART Testing** (`/disks/smart/start/<device>/<mode>`)
+- Run short or long SMART tests
+- View detailed SMART reports with temperature and health status
+- Track SMART history over time
+- Export/import SMART data in CSV format
+
+**Disk Formatting** (`/disks/format/<device>`)
+- Format disks with ext4, XFS, or FAT32 filesystems
+- Background task execution with progress tracking
+- Safe wipefs operation before formatting
+
+**Block Validation** (`/disks/validate/<device>`)
+- Validates the first 256 blocks of a disk
+- Visual display of good/bad blocks
+- Identifies potential disk errors
+
+**Automatic Mode** (`/disks/toggle_auto`)
+- Automatically detect newly connected disks
+- Auto-format and run SMART tests on new disks
+- Configurable to skip system disks (e.g., mmcblk0, nvme*)
+
+**History & Monitoring** (`/disks/history`)
+- Complete log of all disk operations
+- SMART test history with health trends
+- Task management (view/stop running operations)
+
+**Dashboard** (`/disks/dashboard`)
+- Summary statistics: total disks, bad disks, running tasks
+- Device runtime tracking
+
+**Remote Disk Management** (`/disks/remotes`)
+- Manage remote disk systems
+- Add/remove remote connections
+
+**Plugin System**
+- Extensible addon architecture
+- Create custom disk management tools
+- See `addons/` directory for examples
+
+### Running with Disk Tools
+Since disk operations require root privileges, run the application with sudo:
+```bash
+sudo python3 app.py
+```
+
+### Security Note
+The application requires root access for disk operations. This poses security risks:
+- Only run on trusted networks
+- Use HTTPS/TLS for production deployments
+- Change default credentials before exposing publicly
+- Consider using a reverse proxy with proper authentication
+- Limit access to trusted users only
