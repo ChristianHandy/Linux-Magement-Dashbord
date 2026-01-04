@@ -59,7 +59,7 @@ def update(name):
     ).start()
     return redirect(f"/progress/{name}")
 
-@app.route("/progress/<name")
+@app.route("/progress/<name>")
 def progress(name):
     return render_template("progress.html", log=logs.get(name, []))
 
