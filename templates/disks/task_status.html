@@ -3,7 +3,7 @@
 <h2>Task {{ op_id }}: {{ action }}</h2>
 <div class="progress" style="height:30px"><div id="bar" class="progress-bar" style="width:0%">0%</div></div>
 <p id="status" class="mt-2">Status: RUNNING</p>
-<a href="{{ url_for('history') }}" class="btn btn-secondary mt-3">Zurück</a>
+<a href="{{ url_for('disk_history') }}" class="btn btn-secondary mt-3">Back</a>
 <script>
 async function poll() {
   const r = await fetch('{{ url_for("task_status_api", op_id=op_id) }}');

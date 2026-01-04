@@ -1,7 +1,7 @@
 {% extends 'disks/base.html' %}
 {% block title %}Reloaded{% endblock %}
 {% block content %}
-  <h1>Reload für /dev/{{ device }}</h1>
-  <p>Datei erstellt: {{ path }}</p>
-  <a href="{{ url_for('index') }}" class="btn btn-primary">Zurück zur Übersicht</a>
+  <h1>Reload for /dev/{{ device }}</h1>
+  <p>File created: {{ path }}</p>
+  <a href="{{ url_for('disks_index') }}" class="btn btn-primary">Back to Overview</a>
 {% endblock %}

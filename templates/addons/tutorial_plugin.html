@@ -1,18 +1,18 @@
-{% extends 'base.html' %}
+{% extends 'disks/base.html' %}
 {% block title %}Tutorial Plugin – {{ device }}{% endblock %}
 {% block content %}
 <div class='container mt-4'>
   <h1>Tutorial Plugin</h1>
-  <p>Dies ist eine Beispielseite, die du mit dem <code>tutorial_plugin</code> erzeugt hast.</p>
-  <p>Aktuelles Gerät: <strong>{{ device }}</strong></p>
+  <p>This is an example page created with the <code>tutorial_plugin</code>.</p>
+  <p>Current device: <strong>{{ device }}</strong></p>
   <hr>
-  <h5>🔧 Hinweise:</h5>
+  <h5>🔧 Notes:</h5>
   <ul>
-    <li>Dieses HTML stammt aus dem Python-Code in <code>tutorial_plugin.py</code>.</li>
-    <li>Wird automatisch extrahiert und gespeichert unter <code>templates/addons/tutorial_plugin.html</code>.</li>
-    <li>Ein Button erscheint automatisch hinter jeder Festplatte.</li>
-    <li>Die Seite nutzt <code>base.html</code> als Grundlage.</li>
+    <li>This HTML comes from the Python code in <code>tutorial_plugin.py</code>.</li>
+    <li>Automatically extracted and saved under <code>templates/addons/tutorial_plugin.html</code>.</li>
+    <li>A button appears automatically behind each disk.</li>
+    <li>The page uses <code>disks/base.html</code> as foundation.</li>
   </ul>
-  <a href='/' class='btn btn-secondary mt-3'>Zurück</a>
+  <a href='{{ url_for('disks_index') }}' class='btn btn-secondary mt-3'>Back</a>
 </div>
 {% endblock %}

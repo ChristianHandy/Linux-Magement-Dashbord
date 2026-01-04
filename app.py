@@ -322,6 +322,20 @@ def stop_task(op_id):
 @app.route("/disks/addons/<plugin>/<device>")
 @login_required
 def render_plugin_page(plugin, device):
+    # Validate plugin name to prevent template injection
+    # Only allow alphanumeric characters and underscores
+    import re
+    if not re.match(r'^[a-zA-Z0-9_]+$', plugin):
+        flash('Invalid plugin name')
+        return redirect(url_for('disks_index'))
+    
+    # Check if the plugin template exists
+    from pathlib import Path
+    template_path = Path(app.template_folder) / 'addons' / f'{plugin}.html'
+    if not template_path.exists():
+        flash(f'Plugin {plugin} not found')
+        return redirect(url_for('disks_index'))
+    
     return render_template(f'addons/{plugin}.html', device=device)
 
 @app.route("/disks/remotes", methods=['GET', 'POST'])
