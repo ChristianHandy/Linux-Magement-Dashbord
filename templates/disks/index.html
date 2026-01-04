@@ -1,0 +1,19 @@
+{% extends 'disks/base.html' %}{% block title %}Disk Overview{% endblock %}
+{% block nav_extra %}<a class="btn btn-sm btn-secondary ms-3" href="{{ url_for('toggle_auto') }}">Auto: {{ 'ON' if auto else 'OFF' }}</a>{% endblock %}
+{% block content %}
+<h1>Disk Overview</h1>
+<form method="get" class="row mb-4">
+  <div class="col-md-4"><input name="q" class="form-control" placeholder="Search device/model" value="{{ request.args.get('q','') }}"></div>
+  <div class="col-auto"><button class="btn btn-primary">Search</button> <a href="{{ url_for('disks_index') }}" class="btn btn-secondary">Reset</a></div>
+</form>
+<table class="table table-hover table-striped"><thead class="table-dark"><tr><th>Device</th><th>Model</th><th>Size</th><th>Actions</th></tr></thead><tbody>
+{% for d in disks %}
+<tr><td>{{ d.device }}</td><td>{{ d.model }}</td><td>{{ d.size }}</td><td>
+  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('smart_start_route', device=d.device, mode='short') }}">SMART</a>
+  <a class="btn btn-sm btn-info" href="{{ url_for('smart_view_route', device=d.device) }}">View</a>
+  <a class="btn btn-sm btn-warning" href="{{ url_for('validate_route', device=d.device) }}">Validate</a>
+  <a class="btn btn-sm btn-danger" href="{{ url_for('format_route', device=d.device) }}">Format</a>
+  {{ hook("device_buttons", d.device)|safe }}
+</td></tr>{% endfor %}</tbody></table>
+<div><a href="{{ url_for('disk_history') }}" class="btn btn-secondary">History</a> <a href="{{ url_for('disk_dashboard') }}" class="btn btn-secondary">Dashboard</a> <a href="{{ url_for('export_smart') }}" class="btn btn-secondary">Export SMART</a> <a href="{{ url_for('import_smart') }}" class="btn btn-secondary">Import SMART</a></div>
+{% endblock %}

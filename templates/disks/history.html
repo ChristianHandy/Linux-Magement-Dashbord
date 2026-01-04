@@ -1,0 +1,16 @@
+{% extends 'disks/base.html' %}{% block title %}History{% endblock %}
+{% block nav_extra %}<a class="btn btn-sm btn-danger ms-3" href="{{ url_for('clear_disk_history') }}">Clear History</a>{% endblock %}
+{% block content %}
+<h1>History</h1>
+<h2>Operations</h2>
+<table class="table table-striped"><thead><tr><th>ID</th><th>Device</th><th>Action</th><th>Status</th><th>Progress</th><th>Time</th></tr></thead><tbody>
+{% for o in ops %}<tr>
+  <td>{{ o.id }}</td><td>{{ o.device }}</td><td>{{ o.action }}</td><td>{{ o.status }}</td>
+  <td>{{ o.progress }}%</td><td>{{ o.ts }}</td>
+</tr>{% endfor %}
+</tbody></table>
+<h2 class="mt-4">SMART History</h2>
+<table class="table table-striped"><thead><tr><th>ID</th><th>Device</th><th>Temp</th><th>Health</th><th>Time</th></tr></thead><tbody>
+{% for s in smart %}<tr><td>{{ s.id }}</td><td>{{ s.device }}</td><td>{{ s.temp }}</td><td>{{ s.health }}</td><td>{{ s.ts }}</td></tr>{% endfor %}
+</tbody></table>
+{% endblock %}

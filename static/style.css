@@ -1,7 +1,7 @@
 body {
   background:#0f172a;
   color:#e5e7eb;
-  font-family:system-ui;
+  font-family:system-ui,"Segoe UI",sans-serif;
   margin:0;
 }
 
@@ -24,6 +24,7 @@ body {
   padding:.6rem 1rem;
   border-radius:8px;
   display:inline-block;
+  text-decoration:none;
 }
 
 .status-online { color:#22c55e; }
@@ -35,4 +36,12 @@ pre {
   border-radius:10px;
   overflow-x:auto;
 }
+
+/* Disk Tools specific styles */
+.navbar-brand { font-weight: bold; letter-spacing: 1px; }
+.table th, .table td { vertical-align: middle; }
+.block { width:10px; height:10px; display:inline-block; margin:1px; }
+.block.good { background-color: #4caf50; }
+.block.bad { background-color: #f44336; }
+.card h3 { margin-bottom: 0.5rem; }
 

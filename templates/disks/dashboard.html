@@ -1,0 +1,13 @@
+{% extends 'disks/base.html' %}{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+<div class="row mb-4">
+  <div class="col"><div class="card p-3"><h3>Total Disks</h3><p>{{ total }}</p></div></div>
+  <div class="col"><div class="card p-3"><h3>Bad Disks</h3><p>{{ bad }}</p></div></div>
+  <div class="col"><div class="card p-3"><h3>Running Tasks</h3><p>{{ running }}</p></div></div>
+</div>
+<h2>Runtimes</h2>
+<table class="table table-striped"><thead><tr><th>Device</th><th>Uptime</th></tr></thead><tbody>
+{% for r in runtimes %}<tr><td>{{ r.device }}</td><td>{{ r.runtime }}</td></tr>{% endfor %}
+</tbody></table>
+{% endblock %}

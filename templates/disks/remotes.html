@@ -1,0 +1,47 @@
+{% extends 'disks/base.html' %}
+{% block title %}Remote Management{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Remote Disk Systems</h2>
+  <form method="post" action="{{ url_for('remotes') }}" class="row g-3 mb-4">
+    <div class="col-md-4">
+      <label class="form-label">Name</label>
+      <input name="name" class="form-control" required />
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Host</label>
+      <input name="host" class="form-control" required />
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Port</label>
+      <input name="port" class="form-control" value="22" type="number" />
+    </div>
+    <div class="col-md-2 align-self-end">
+      <button type="submit" class="btn btn-primary w-100">Add Remote</button>
+    </div>
+  </form>
+
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Host</th>
+        <th>Port</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in remotes %}
+      <tr>
+        <td>{{ r['id'] }}</td>
+        <td>{{ r['name'] }}</td>
+        <td>{{ r['host'] }}</td>
+        <td>{{ r['port'] }}</td>
+        <td><a href="{{ url_for('remotes_delete', rid=r['id']) }}" class="btn btn-sm btn-danger">Delete</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
