@@ -13,11 +13,12 @@ def sanitize_device_name(device):
     """
     Security: Validate and sanitize device names to prevent command injection.
     Only allows alphanumeric characters, hyphens, and underscores.
+    Device names are limited to 255 characters.
     """
     if not device or not isinstance(device, str):
         raise ValueError("Invalid device name")
-    # Only allow safe characters for device names
-    if not re.match(r'^[a-zA-Z0-9_-]+$', device):
+    # Only allow safe characters for device names with reasonable length limit
+    if not re.match(r'^[a-zA-Z0-9_-]{1,255}$', device):
         raise ValueError(f"Invalid device name: {device}")
     return device
 
