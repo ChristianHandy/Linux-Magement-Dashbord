@@ -8,6 +8,9 @@ venv/
 env/
 ENV/
 
+# Environment variables (contains secrets)
+.env
+
 # Disk Tools database
 *.db
 

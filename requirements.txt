@@ -1,4 +1,12 @@
-flask
-paramiko
-apscheduler
+# Web Framework
+flask>=3.0.0
+
+# SSH Client
+paramiko>=3.4.0
+
+# Task Scheduler
+apscheduler>=3.10.4
+
+# For environment variable loading (optional but recommended)
+python-dotenv>=1.0.0
 

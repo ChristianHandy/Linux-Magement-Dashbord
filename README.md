@@ -34,27 +34,43 @@ A comprehensive web dashboard combining system update management and disk tools 
 3. Create virtual env: `python3 -m venv venv`
 4. Activate: `source venv/bin/activate`
 5. Install requirements: `pip install -r requirements.txt`
-6. Run: `python app.py` (requires sudo for disk management features)
+6. **Configure security settings:**
+   ```bash
+   # Copy the example environment file
+   cp .env.example .env
+   
+   # Edit .env and set secure values:
+   # - Generate a secure SECRET_KEY: python -c "import secrets; print(secrets.token_hex(32))"
+   # - Set DASHBOARD_USERNAME and DASHBOARD_PASSWORD to secure credentials
+   nano .env
+   ```
+7. Run: `python app.py` (requires sudo for disk management features)
 
 ## Quick Start
 
-1. Start the application:
+1. **Configure credentials (REQUIRED for security):**
+   ```bash
+   # Set environment variables with secure credentials
+   export SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+   export DASHBOARD_USERNAME=your_username
+   export DASHBOARD_PASSWORD=your_secure_password
+   ```
+
+2. Start the application:
    ```bash
    # For system updates only (no sudo needed)
    python3 app.py
    
    # For full features including disk management (requires sudo)
-   sudo python3 app.py
+   sudo -E python3 app.py  # -E preserves environment variables
    ```
 
-2. Open your browser to `http://localhost:5000`
+3. Open your browser to `http://localhost:5000`
 
-3. Login with default credentials:
-   - Username: `admin`
-   - Password: `password`
-   - **Important:** Change these credentials before exposing the dashboard publicly!
+4. Login with your configured credentials
+   - **Important:** Never use default credentials in production!
 
-4. From the main menu, choose:
+5. From the main menu, choose:
    - **System Update Manager** (`/dashboard`) - Manage remote Linux systems
    - **Disk Management Tools** (`/disks`) - Format and test disks (requires sudo)
 
@@ -128,12 +144,90 @@ Backup and restore hosts.json
 - Restore:
   - mv hosts.json.bak hosts.json
 
-Security notes (read before using publicly)
+## Security
+
+### Security Improvements
+This project has been hardened with the following security improvements:
+
+**Authentication & Credentials:**
+- ✅ Credentials moved to environment variables (no hardcoded passwords)
+- ✅ Secure session key generation using `secrets.token_hex(32)`
+- ✅ Warning printed when using default credentials
+- ✅ `.env.example` file provided for configuration
+
+**Command Injection Prevention:**
+- ✅ Device name sanitization to prevent command injection
+- ✅ Input validation on all disk operations
+- ✅ SFTP used instead of shell commands for SSH key installation
+- ✅ Whitelist validation for filesystem types and SMART modes
+
+**Security Headers:**
+- ✅ X-Content-Type-Options: nosniff
+- ✅ X-Frame-Options: DENY
+- ✅ X-XSS-Protection enabled
+- ✅ Strict-Transport-Security for HTTPS
+
+**Other Improvements:**
+- ✅ Debug mode disabled by default (controlled via FLASK_DEBUG environment variable)
+- ✅ Plugin name validation to prevent template injection
+- ✅ SQL parameterized queries (already implemented)
+
+### Important Security Notes
+
+**Before Production Deployment:**
+1. **Set secure credentials** using environment variables:
+   ```bash
+   export SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+   export DASHBOARD_USERNAME=your_secure_username
+   export DASHBOARD_PASSWORD=your_secure_password
+   ```
+
+2. **Use HTTPS/TLS** - This is critical! Without TLS:
+   - Passwords are transmitted in plain text
+   - Session cookies can be intercepted
+   - SSH passwords sent to the server are exposed
+
+3. **SSH Host Key Verification** - The current implementation uses `AutoAddPolicy`, which accepts any host key. This is vulnerable to man-in-the-middle attacks. For production:
+   - Manually verify host keys on first connection
+   - Use `WarningPolicy` instead of `AutoAddPolicy`
+   - Maintain a proper `known_hosts` file
+
+4. **Network Security:**
+   - Run behind a reverse proxy (nginx, Apache) with TLS
+   - Restrict access to trusted networks/VPN only
+   - Consider using firewall rules to limit access
+   - Never expose directly to the internet without proper hardening
+
+5. **Additional Hardening (Recommended):**
+   - Add CSRF protection using Flask-WTF
+   - Implement rate limiting for login attempts
+   - Add two-factor authentication
+   - Use a production WSGI server (gunicorn, uWSGI) instead of Flask's development server
+   - Implement audit logging for all operations
+   - Regular security updates for all dependencies
+
+6. **Disk Operations Security:**
+   - Requires root/sudo access (significant security risk)
+   - Only run on isolated, trusted systems
+   - Validate that only intended disks are being modified
+   - Consider running disk operations in a separate, sandboxed process
+
+### Environment Variables
+
+Create a `.env` file or set these environment variables:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `SECRET_KEY` | Recommended | Auto-generated | Flask session encryption key |
+| `DASHBOARD_USERNAME` | Recommended | admin | Dashboard login username |
+| `DASHBOARD_PASSWORD` | Recommended | password | Dashboard login password |
+| `FLASK_DEBUG` | Optional | false | Enable Flask debug mode (never in production!) |
+
+Security notes (legacy - see Security section above for updated guidance)
 - Use HTTPS/TLS if the dashboard is reachable over an untrusted network, otherwise passwords and session cookies travel unencrypted.
 - The "Install SSH key" flow requires you to enter the remote account password; that password is sent to the dashboard server and used transiently. Do not expose the dashboard without TLS and strong authentication.
 - The dashboard may generate and store a private key under `~/.ssh` on the dashboard host. Protect that machine and its filesystem.
-- Add CSRF protection (Flask-WTF) and stronger authentication before exposing publicly.
-- Consider moving credentials and the `app.secret_key` into environment variables instead of hardcoding them.
+- Credentials and `app.secret_key` now use environment variables (see Security section).
 
 Running & testing
 1. Ensure dependencies are installed:
@@ -212,13 +306,23 @@ sudo apt install smartmontools parted e2fsprogs xfsprogs dosfstools
 ### Running with Disk Tools
 Since disk operations require root privileges, run the application with sudo:
 ```bash
-sudo python3 app.py
+# Export environment variables first
+export SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+export DASHBOARD_USERNAME=your_username
+export DASHBOARD_PASSWORD=your_password
+
+# Run with sudo, preserving environment variables
+sudo -E python3 app.py
 ```
 
-### Security Note
-The application requires root access for disk operations. This poses security risks:
-- Only run on trusted networks
-- Use HTTPS/TLS for production deployments
-- Change default credentials before exposing publicly
+### Disk Tools Security Note
+The application requires root access for disk operations. This poses significant security risks:
+- **Only run on isolated, trusted systems** - Root access means any vulnerability can compromise the entire system
+- **Never expose to the internet** without multiple layers of security
+- Use HTTPS/TLS for all deployments (critical!)
+- Set secure credentials via environment variables (see Security section)
 - Consider using a reverse proxy with proper authentication
 - Limit access to trusted users only
+- Run in a VM or container for additional isolation
+- Regularly audit disk operations and review logs
+- See the **Security** section above for comprehensive security guidance

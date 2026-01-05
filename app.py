@@ -1,16 +1,29 @@
 from flask import Flask, render_template, redirect, session, request, flash, jsonify, send_file, url_for
-import json, threading, paramiko, os
+import json, threading, paramiko, os, secrets
 from updater import run_update
 import scheduler
 import disktool_core
 from addon_loader import AddonManager
 from functools import wraps
 
-app = Flask(__name__, template_folder="templates", static_folder="static")
-app.secret_key = "change_me"
+# Load environment variables from .env file if python-dotenv is available
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv is optional
 
-USERNAME = "admin"
-PASSWORD = "password"
+app = Flask(__name__, template_folder="templates", static_folder="static")
+
+# Security: Use environment variables for credentials, generate secure secret key
+app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
+
+USERNAME = os.environ.get('DASHBOARD_USERNAME', 'admin')
+PASSWORD = os.environ.get('DASHBOARD_PASSWORD', 'password')
+
+# Warn if using default credentials
+if USERNAME == 'admin' and PASSWORD == 'password':
+    print("WARNING: Using default credentials! Set DASHBOARD_USERNAME and DASHBOARD_PASSWORD environment variables.")
 
 # Initialize Disk Tools addon system
 addon_mgr = AddonManager(app, disktool_core)
@@ -27,6 +40,8 @@ logs = {}
 def is_online(host, user):
     try:
         ssh = paramiko.SSHClient()
+        # Security Note: AutoAddPolicy accepts any host key, making this vulnerable to MITM attacks.
+        # For production, use WarningPolicy or maintain a known_hosts file.
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(host, username=user, timeout=3)
         ssh.close()
@@ -194,20 +209,43 @@ def install_key(name):
         target = hosts[name]
         try:
             ssh = paramiko.SSHClient()
+            # Security Note: AutoAddPolicy accepts any host key, making this vulnerable to MITM attacks.
+            # For production, use WarningPolicy or maintain a known_hosts file.
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             ssh.connect(target["host"], username=target["user"], password=password, timeout=10)
-            safe_key = pubkey.replace('\"', '\\\"')
-            cmd = (
-                'mkdir -p ~/.ssh && chmod 700 ~/.ssh && '
-                f'echo "{safe_key}" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'
-            )
-            stdin, stdout, stderr = ssh.exec_command(cmd)
-            err = stderr.read().decode().strip()
-            ssh.close()
-            if err:
-                error = f"Remote error: {err}"
-            else:
-                success = True
+            
+            # Security: Use SFTP to safely write the key file instead of shell commands
+            try:
+                sftp = ssh.open_sftp()
+                # Create .ssh directory
+                try:
+                    sftp.stat('.ssh')
+                except IOError:
+                    sftp.mkdir('.ssh')
+                    sftp.chmod('.ssh', 0o700)
+                
+                # Read existing authorized_keys if present
+                auth_keys_path = '.ssh/authorized_keys'
+                try:
+                    with sftp.file(auth_keys_path, 'r') as f:
+                        existing_keys = f.read().decode('utf-8')
+                except IOError:
+                    existing_keys = ''
+                
+                # Append new key if not already present
+                if pubkey not in existing_keys:
+                    with sftp.file(auth_keys_path, 'a') as f:
+                        f.write(f'\n{pubkey}\n')
+                    sftp.chmod(auth_keys_path, 0o600)
+                    success = True
+                else:
+                    success = True  # Key already installed
+                    
+                sftp.close()
+            except Exception as e:
+                error = f"SFTP error: {e}"
+            finally:
+                ssh.close()
         except Exception as e:
             error = f"Connection error: {e}"
     return render_template("install_key.html", name=name, error=error, success=success)
@@ -235,8 +273,16 @@ def toggle_auto():
 @app.route("/disks/format/<device>", methods=['GET','POST'])
 @login_required
 def format_route(device):
+    try:
+        device = disktool_core.sanitize_device_name(device)
+    except ValueError as e:
+        flash(f'Invalid device name: {e}')
+        return redirect(url_for('disks_index'))
     if request.method == 'POST':
         fs = request.form.get('fs','ext4')
+        if fs not in {'ext4', 'xfs', 'fat32'}:
+            flash('Invalid filesystem type')
+            return redirect(url_for('disks_index'))
         op_id = disktool_core.start_format(device, fs)
         flash(f'Format task {op_id} started for {device}')
         return redirect(url_for('task_status', op_id=op_id))
@@ -245,6 +291,11 @@ def format_route(device):
 @app.route("/disks/smart/start/<device>/<mode>")
 @login_required
 def smart_start_route(device, mode):
+    try:
+        device = disktool_core.sanitize_device_name(device)
+    except ValueError as e:
+        flash(f'Invalid device name: {e}')
+        return redirect(url_for('disks_index'))
     if mode not in {'short','long'}:
         flash('Invalid SMART type')
         return redirect(url_for('disks_index'))
@@ -255,12 +306,22 @@ def smart_start_route(device, mode):
 @app.route("/disks/smart/view/<device>")
 @login_required
 def smart_view_route(device):
+    try:
+        device = disktool_core.sanitize_device_name(device)
+    except ValueError as e:
+        flash(f'Invalid device name: {e}')
+        return redirect(url_for('disks_index'))
     report = disktool_core.view_smart(device)
     return render_template('disks/smart_view.html', device=device, report=report)
 
 @app.route("/disks/validate/<device>")
 @login_required
 def validate_route(device):
+    try:
+        device = disktool_core.sanitize_device_name(device)
+    except ValueError as e:
+        flash(f'Invalid device name: {e}')
+        return redirect(url_for('disks_index'))
     blocks, bad = disktool_core.validate_blocks(device)
     return render_template('disks/validate.html', device=device, blocks=blocks, bad_blocks=bad)
 
@@ -329,6 +390,13 @@ def render_plugin_page(plugin, device):
         flash('Invalid plugin name')
         return redirect(url_for('disks_index'))
     
+    # Validate device name
+    try:
+        device = disktool_core.sanitize_device_name(device)
+    except ValueError as e:
+        flash(f'Invalid device name: {e}')
+        return redirect(url_for('disks_index'))
+    
     # Check if the plugin template exists
     from pathlib import Path
     template_path = Path(app.template_folder) / 'addons' / f'{plugin}.html'
@@ -358,9 +426,22 @@ def remotes_delete(rid):
     flash('Remote removed')
     return redirect(url_for('remotes'))
 
+# Security: Add security headers
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    # Only set HSTS header for HTTPS connections
+    if request.is_secure:
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
+
 if __name__ == "__main__":
     # Initialize Disk Tools database
     disktool_core.init_db()
     # Start Disk Tools auto-mode worker
     threading.Thread(target=disktool_core.auto_mode_worker, daemon=True).start()
-    app.run(host="0.0.0.0", port=5000)
+    # Security: Disable debug mode in production
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    app.run(host="0.0.0.0", port=5000, debug=debug_mode)
