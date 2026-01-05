@@ -9,6 +9,18 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 auto_enabled = False
 AUTO_SKIP_DEVICE = 'mmcblk0'  # z.B. Systemlaufwerk, das bei Auto-Sync ignoriert wird
 
+def sanitize_device_name(device):
+    """
+    Security: Validate and sanitize device names to prevent command injection.
+    Only allows alphanumeric characters, hyphens, and underscores.
+    """
+    if not device or not isinstance(device, str):
+        raise ValueError("Invalid device name")
+    # Only allow safe characters for device names
+    if not re.match(r'^[a-zA-Z0-9_-]+$', device):
+        raise ValueError(f"Invalid device name: {device}")
+    return device
+
 def get_db():
     """Stellt eine DB-Verbindung her und liefert das Connection-Objekt zurück."""
     conn = sqlite3.connect(DB_FILE)
@@ -83,6 +95,7 @@ def ls_disks():
 def get_serial(dev):
     """Ermittelt die Seriennummer eines Geräts via smartctl, falls verfügbar."""
     try:
+        dev = sanitize_device_name(dev)
         info = run(['smartctl', '-i', f'/dev/{dev}'])
         for line in info.splitlines():
             if 'Serial Number' in line:
@@ -147,8 +160,9 @@ def update_op(op_id, status=None, progress=None):
 # --- Langlaufende Tasks (Formatierung, SMART-Test) ---
 def format_worker(device, fs, op_id):
     """Führt die Formatierung eines Geräts aus (Hintergrund-Thread)."""
-    path = f'/dev/{device}'
     try:
+        device = sanitize_device_name(device)
+        path = f'/dev/{device}'
         run(['wipefs', '-a', path])
         cmd_map = {'ext4': ['mkfs.ext4', '-F'], 'xfs': ['mkfs.xfs', '-f'], 'fat32': ['mkfs.vfat', '-F', '32']}
         if fs not in cmd_map:
@@ -166,11 +180,15 @@ def start_format(device, fs):
 
 def start_smart(device, mode):
     """Startet einen SMART-Test (kurz/lang) für device."""
+    device = sanitize_device_name(device)
+    if mode not in ('short', 'long'):
+        raise ValueError("Invalid SMART mode")
     run(['smartctl', '-t', mode, f'/dev/{device}'])
     log_op(device, f'SMART_{mode.upper()}')
 
 def view_smart(device):
     """Liest SMART-Report via smartctl und loggt Temperatur/Health in die History."""
+    device = sanitize_device_name(device)
     out = run(['smartctl', '-a', f'/dev/{device}'])
     m = re.search(r'Temperature_Celsius.*\s(\d+)', out)
     temp = int(m.group(1)) if m else None
@@ -182,6 +200,7 @@ def view_smart(device):
 
 def validate_blocks(device):
     """Prüft die ersten Blöcke eines Geräts mit direkten Leseversuchen und markiert fehlerhafte Blöcke."""
+    device = sanitize_device_name(device)
     # Versuche, die ersten N Blöcke (z.B. 256) zu lesen und sammle fehlerhafte Indices
     max_blocks = 256
     bad_blocks = []
