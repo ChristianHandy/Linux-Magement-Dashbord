@@ -4,6 +4,14 @@
 <div class="container">
 <h2>Linux Management Dashboard</h2>
 
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
 <div class="card">
   <h3>System Update Manager</h3>
   <p>Monitor and update multiple Linux computers remotely via SSH</p>
@@ -14,6 +22,13 @@
   <h3>Disk Management Tools</h3>
   <p>Format, test, and validate disk drives with SMART monitoring</p>
   <a class="btn" href="/disks">Go to Disk Tools</a>
+</div>
+
+<div class="card">
+  <h3>User Profile & Settings</h3>
+  <p>Manage your profile and account settings</p>
+  <a class="btn" href="/users/profile">My Profile</a>
+  <a class="btn" href="/users">User Management (Admin)</a>
 </div>
 
 <div class="card">

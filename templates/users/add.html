@@ -1,0 +1,36 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/static/style.css">
+
+<div class="container">
+  <h2>Add New User</h2>
+  <p><a class="btn" href="/users">Back to User List</a></p>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <form method="post" class="card">
+    <label>Username *</label><br>
+    <input name="username" placeholder="username" required><br><br>
+    
+    <label>Password *</label><br>
+    <input name="password" type="password" placeholder="password" required><br><br>
+    
+    <label>Email</label><br>
+    <input name="email" type="email" placeholder="user@example.com"><br><br>
+    
+    <label>Roles *</label><br>
+    {% for role in all_roles %}
+      <input type="checkbox" name="roles" value="{{ role.name }}" id="role_{{ role.id }}"
+        {% if role.name == 'viewer' %}checked{% endif %}>
+      <label for="role_{{ role.id }}">{{ role.name }} - {{ role.description }}</label><br>
+    {% endfor %}
+    <br>
+    
+    <button class="btn" type="submit">Create User</button>
+  </form>
+</div>
