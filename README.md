@@ -10,6 +10,16 @@ A comprehensive web dashboard combining system update management and disk tools 
 
 ## Features
 
+### User Management & Security
+- **Multi-user authentication** with secure password hashing
+- **Role-based access control (RBAC)** with three built-in roles:
+  - **Admin**: Full system access including user management
+  - **Operator**: Can perform system operations (updates, disk management)
+  - **Viewer**: Read-only access to system information
+- User profile management
+- Backward compatibility with environment variable authentication
+- Secure session management
+
 ### System Update Manager
 - Trigger updates remotely on multiple Linux computers via SSH
 - Mobile-friendly UI
@@ -73,16 +83,119 @@ A comprehensive web dashboard combining system update management and disk tools 
 5. From the main menu, choose:
    - **System Update Manager** (`/dashboard`) - Manage remote Linux systems
    - **Disk Management Tools** (`/disks`) - Format and test disks (requires sudo)
+   - **User Management** (`/users`) - Manage users and roles (admin only)
+   - **My Profile** (`/users/profile`) - Update your own profile
 
 ## Usage
 
-The dashboard provides two main tools accessible from the main menu:
+The dashboard provides multiple tools accessible from the main menu:
 
 ### System Update Manager (`/dashboard`)
 Monitor and update remote Linux systems via SSH. See "Managing hosts" section below for details.
 
 ### Disk Management Tools (`/disks`)
 Format, test, and monitor disk drives. Requires root/sudo privileges for disk operations.
+
+### User Management (`/users`)
+Administrators can manage user accounts and assign roles. See "User Management" section below for details.
+
+## User Management
+
+The dashboard includes a comprehensive user management system with role-based access control.
+
+### Initial Setup
+
+On first run, the application automatically creates an admin user from your environment variables:
+- Username: Value of `DASHBOARD_USERNAME` (default: `admin`)
+- Password: Value of `DASHBOARD_PASSWORD` (default: `password`)
+- Role: Automatically assigned `admin` role
+
+**Important:** Change the default credentials immediately!
+
+### User Roles
+
+The system includes three built-in roles with different permission levels:
+
+1. **Admin** - Full system access
+   - Manage users and roles
+   - All operator permissions
+   - Access user management interface
+
+2. **Operator** - Can perform system operations
+   - Trigger system updates
+   - Manage hosts
+   - Format disks and run SMART tests
+   - Manage disk remotes
+   - Import/export data
+   - Cannot manage users
+
+3. **Viewer** - Read-only access
+   - View all system information
+   - View disk information and SMART data
+   - View host configurations
+   - Cannot modify anything
+
+### Managing Users (Admin Only)
+
+**Accessing User Management:**
+- Navigate to `/users` or click "User Management" from the main menu
+- Only administrators can access this section
+
+**Creating a New User:**
+1. Click "Add New User"
+2. Enter username, password, and email (optional)
+3. Select one or more roles
+4. Click "Create User"
+
+**Editing a User:**
+1. From the user list, click "Edit" next to the user
+2. Modify username, email, password (optional), or active status
+3. Change role assignments by checking/unchecking roles
+4. Click "Update User"
+
+**Deleting a User:**
+1. From the user list, click "Delete" next to the user
+2. Confirm the deletion
+3. Note: You cannot delete your own account
+
+### User Profile
+
+All users can manage their own profile:
+1. Click "My Profile" from the main menu or navigate to `/users/profile`
+2. Update your email or change your password
+3. View your assigned roles
+
+### Routes
+
+User Management Routes:
+- User list: `/users` (admin only)
+- Add user: `/users/add` (admin only)
+- Edit user: `/users/edit/<id>` (admin only)
+- Delete user: `/users/delete/<id>` (admin only, POST)
+- User profile: `/users/profile` (all users)
+
+### Authentication Flow
+
+The system supports two authentication methods for backward compatibility:
+
+1. **Database Authentication** (Recommended)
+   - User accounts stored in SQLite database
+   - Passwords hashed with werkzeug security
+   - Supports multiple users with different roles
+
+2. **Environment Variable Authentication** (Legacy)
+   - Single user from `DASHBOARD_USERNAME` and `DASHBOARD_PASSWORD`
+   - Maintained for backward compatibility
+   - Automatically migrated to database on first run
+
+### Database
+
+User information is stored in `users.db` (SQLite database) with the following tables:
+- `users` - User accounts with hashed passwords
+- `roles` - Available system roles
+- `user_roles` - Many-to-many relationship between users and roles
+
+The database is automatically created on first run and excluded from git (via `.gitignore`).
 
 ## Managing hosts (via web UI)
 
@@ -99,10 +212,7 @@ Routes
 - Update a host (starts update thread): `/update/<name>`
 - Update progress: `/progress/<name>`
 
-Default credentials (change before exposing publicly)
-- Username: `admin`
-- Password: `password`
-- Secret (session): `app.secret_key = "change_me"` in `app.py`
+**Note:** Host management operations (add, edit, delete) require operator or admin role.
 
 Add a host (via web)
 1. Log in to the dashboard (`/`) with the configured username/password.

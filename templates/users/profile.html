@@ -1,0 +1,35 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/static/style.css">
+
+<div class="container">
+  <h2>My Profile</h2>
+  <p><a class="btn" href="/index">Back to Main Menu</a></p>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="card">
+    <h3>Account Information</h3>
+    <b>Username:</b> {{ user.username }}<br>
+    <b>Email:</b> {{ user.email or 'Not set' }}<br>
+    <b>Roles:</b> {{ user_roles|join(', ') }}<br>
+    <b>Account created:</b> {{ user.created_at }}<br>
+  </div>
+
+  <form method="post" class="card">
+    <h3>Update Profile</h3>
+    
+    <label>Email</label><br>
+    <input name="email" type="email" value="{{ user.email or '' }}" placeholder="user@example.com"><br><br>
+    
+    <label>New Password (leave blank to keep current)</label><br>
+    <input name="password" type="password" placeholder="new password"><br><br>
+    
+    <button class="btn" type="submit">Update Profile</button>
+  </form>
+</div>

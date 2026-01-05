@@ -5,6 +5,7 @@ import scheduler
 import disktool_core
 from addon_loader import AddonManager
 from functools import wraps
+import user_management
 
 # Load environment variables from .env file if python-dotenv is available
 try:
@@ -35,7 +36,36 @@ addon_mgr.load_addons()
 def inject_hooks():
     return dict(hook=lambda name, *args, **kwargs: addon_mgr.render_hooks(name, *args, **kwargs))
 
+# Template function for user context
+@app.context_processor
+def inject_user_context():
+    """Make user information available in all templates."""
+    user_id = session.get("user_id")
+    user_roles = []
+    is_admin = False
+    
+    if user_id:
+        user_roles = user_management.get_user_role_names(user_id)
+        is_admin = 'admin' in user_roles
+    
+    return dict(
+        current_user_id=user_id,
+        current_user_roles=user_roles,
+        is_admin=is_admin
+    )
+
 logs = {}
+
+def current_user_has_role(*roles):
+    """Check if the current logged-in user has any of the specified roles."""
+    user_id = session.get("user_id")
+    if not user_id:
+        return False
+    user_roles = user_management.get_user_role_names(user_id)
+    # Admin has access to everything
+    if 'admin' in user_roles:
+        return True
+    return any(role in user_roles for role in roles)
 
 def is_online(host, user):
     try:
@@ -87,34 +117,57 @@ def get_local_public_key():
         raise RuntimeError(f"Failed to obtain or generate local SSH key: {e}")
 
 def login_required(f):
+    """Decorator to require login - uses new user management system."""
     @wraps(f)
     def wrapped(*args, **kwargs):
-        if not session.get("login"):
-            return redirect(url_for('login', next=request.path))
-        return f(*args, **kwargs)
+        # Check new user_id session first
+        if session.get("user_id"):
+            return f(*args, **kwargs)
+        # Fallback to old login session for backward compatibility
+        if session.get("login"):
+            return f(*args, **kwargs)
+        return redirect(url_for('login', next=request.path))
     return wrapped
 
 @app.route("/", methods=["GET", "POST"])
 def login():
     next_url = request.args.get('next') or url_for('index')
     if request.method == "POST":
-        if request.form.get("user") == USERNAME and request.form.get("pass") == PASSWORD:
+        username = request.form.get("user")
+        password = request.form.get("pass")
+        
+        # Try database authentication first
+        user_id = user_management.verify_password(username, password)
+        if user_id:
+            session["user_id"] = user_id
+            session["username"] = username
+            # Keep old session key for backward compatibility
             session["login"] = True
             flash('Logged in successfully')
             return redirect(next_url)
+        
+        # Fallback to environment variable authentication for backward compatibility
+        if username == USERNAME and password == PASSWORD:
+            session["login"] = True
+            session["username"] = username
+            flash('Logged in successfully (legacy mode)')
+            return redirect(next_url)
+        
+        flash('Invalid username or password')
     return render_template("login.html", next=next_url)
 
 @app.route("/logout")
 def logout():
     session.pop("login", None)
+    session.pop("user_id", None)
+    session.pop("username", None)
     flash('Logged out')
     return redirect(url_for('login'))
 
 @app.route("/index")
+@login_required
 def index():
     """Main menu/landing page showing both tools"""
-    if not session.get("login"):
-        return redirect("/")
     return render_template("index.html")
 
 @app.route("/dashboard")
@@ -129,6 +182,11 @@ def dashboard():
 @app.route("/update/<name>")
 @login_required
 def update(name):
+    # Require operator or admin role to perform updates
+    if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+        flash('You need operator or admin role to perform system updates.')
+        return redirect(url_for('dashboard'))
+    
     hosts = load_hosts()
     logs[name] = []
     threading.Thread(
@@ -148,6 +206,11 @@ def progress(name):
 def manage_hosts():
     hosts = load_hosts()
     if request.method == "POST":
+        # Require operator or admin role to modify hosts
+        if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+            flash('You need operator or admin role to manage hosts.')
+            return redirect(url_for('manage_hosts'))
+        
         # Add or update host via the add form
         name = request.form.get("name", "").strip()
         host = request.form.get("host", "").strip()
@@ -166,6 +229,11 @@ def edit_host(orig_name):
     if orig_name not in hosts:
         return redirect("/hosts")
     if request.method == "POST":
+        # Require operator or admin role to modify hosts
+        if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+            flash('You need operator or admin role to manage hosts.')
+            return redirect(url_for('manage_hosts'))
+        
         new_name = request.form.get("name", "").strip()
         host = request.form.get("host", "").strip()
         user = request.form.get("user", "").strip()
@@ -183,6 +251,11 @@ def edit_host(orig_name):
 @app.route("/hosts/delete/<name>", methods=["POST"])
 @login_required
 def delete_host(name):
+    # Require operator or admin role to delete hosts
+    if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+        flash('You need operator or admin role to delete hosts.')
+        return redirect(url_for('manage_hosts'))
+    
     hosts = load_hosts()
     if name in hosts:
         hosts.pop(name)
@@ -193,6 +266,11 @@ def delete_host(name):
 @app.route("/hosts/install_key/<name>", methods=["GET", "POST"])
 @login_required
 def install_key(name):
+    # Require operator or admin role to install keys
+    if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+        flash('You need operator or admin role to install SSH keys.')
+        return redirect(url_for('manage_hosts'))
+    
     hosts = load_hosts()
     if name not in hosts:
         return redirect("/hosts")
@@ -266,6 +344,11 @@ def disks_index():
 @app.route("/disks/toggle_auto")
 @login_required
 def toggle_auto():
+    # Require operator or admin role to toggle automatic mode
+    if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+        flash('You need operator or admin role to toggle automatic mode.')
+        return redirect(url_for('disks_index'))
+    
     disktool_core.auto_enabled = not disktool_core.auto_enabled
     flash(f"Automatic mode {'ON' if disktool_core.auto_enabled else 'OFF'}")
     return redirect(url_for('disks_index'))
@@ -279,6 +362,11 @@ def format_route(device):
         flash(f'Invalid device name: {e}')
         return redirect(url_for('disks_index'))
     if request.method == 'POST':
+        # Require operator or admin role to format disks
+        if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+            flash('You need operator or admin role to format disks.')
+            return redirect(url_for('disks_index'))
+        
         fs = request.form.get('fs','ext4')
         if fs not in {'ext4', 'xfs', 'fat32'}:
             flash('Invalid filesystem type')
@@ -291,6 +379,11 @@ def format_route(device):
 @app.route("/disks/smart/start/<device>/<mode>")
 @login_required
 def smart_start_route(device, mode):
+    # Require operator or admin role to start SMART tests
+    if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+        flash('You need operator or admin role to start SMART tests.')
+        return redirect(url_for('disks_index'))
+    
     try:
         device = disktool_core.sanitize_device_name(device)
     except ValueError as e:
@@ -334,6 +427,11 @@ def disk_history():
 @app.route("/disks/clear_history")
 @login_required
 def clear_disk_history():
+    # Require operator or admin role to clear history
+    if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+        flash('You need operator or admin role to clear history.')
+        return redirect(url_for('disk_history'))
+    
     disktool_core.clear_history()
     flash('History cleared')
     return redirect(url_for('disk_history'))
@@ -354,6 +452,11 @@ def export_smart():
 @login_required
 def import_smart():
     if request.method == 'POST':
+        # Require operator or admin role to import data
+        if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+            flash('You need operator or admin role to import SMART data.')
+            return redirect(url_for('disk_history'))
+        
         f = request.files['file']
         device = request.form.get('device', 'UNKNOWN')
         disktool_core.import_smart_data(f, device)
@@ -376,6 +479,11 @@ def task_status(op_id):
 @app.route("/disks/task/stop/<int:op_id>")
 @login_required
 def stop_task(op_id):
+    # Require operator or admin role to stop tasks
+    if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+        flash('You need operator or admin role to stop tasks.')
+        return redirect(url_for('disk_history'))
+    
     disktool_core.stop_task(op_id)
     flash(f'Task {op_id} stopped')
     return redirect(url_for('disk_history'))
@@ -410,6 +518,11 @@ def render_plugin_page(plugin, device):
 @login_required
 def remotes():
     if request.method == 'POST':
+        # Require operator or admin role to add remotes
+        if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+            flash('You need operator or admin role to add remotes.')
+            return redirect(url_for('remotes'))
+        
         name = request.form.get('name')
         host = request.form.get('host')
         port = int(request.form.get('port', 22))
@@ -422,9 +535,177 @@ def remotes():
 @app.route("/disks/remotes/delete/<int:rid>")
 @login_required
 def remotes_delete(rid):
+    # Require operator or admin role to delete remotes
+    if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+        flash('You need operator or admin role to delete remotes.')
+        return redirect(url_for('remotes'))
+    
     disktool_core.remove_remote(rid)
     flash('Remote removed')
     return redirect(url_for('remotes'))
+
+# ============================================================================
+# USER MANAGEMENT ROUTES
+# ============================================================================
+
+@app.route("/users")
+@login_required
+def users_list():
+    """List all users - only accessible to admins."""
+    user_id = session.get("user_id")
+    if not user_id:
+        flash('User management requires database authentication.')
+        return redirect(url_for('index'))
+    
+    # Check if user is admin
+    if not user_management.user_has_role(user_id, 'admin'):
+        flash('Only administrators can manage users.')
+        return redirect(url_for('index'))
+    
+    users = user_management.list_users()
+    roles_by_user = {}
+    for user in users:
+        roles_by_user[user['id']] = user_management.get_user_role_names(user['id'])
+    
+    return render_template('users/list.html', users=users, roles_by_user=roles_by_user)
+
+@app.route("/users/add", methods=["GET", "POST"])
+@login_required
+def users_add():
+    """Add a new user - only accessible to admins."""
+    user_id = session.get("user_id")
+    if not user_id:
+        flash('User management requires database authentication.')
+        return redirect(url_for('index'))
+    
+    if not user_management.user_has_role(user_id, 'admin'):
+        flash('Only administrators can manage users.')
+        return redirect(url_for('index'))
+    
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        email = request.form.get("email", "").strip() or None
+        roles = request.form.getlist("roles")
+        
+        if not username or not password:
+            flash('Username and password are required.')
+            return redirect(url_for('users_add'))
+        
+        new_user_id = user_management.create_user(username, password, email, roles)
+        if new_user_id:
+            flash(f'User {username} created successfully.')
+            return redirect(url_for('users_list'))
+        else:
+            flash(f'Username {username} already exists.')
+    
+    all_roles = user_management.list_roles()
+    return render_template('users/add.html', all_roles=all_roles)
+
+@app.route("/users/edit/<int:uid>", methods=["GET", "POST"])
+@login_required
+def users_edit(uid):
+    """Edit a user - only accessible to admins."""
+    user_id = session.get("user_id")
+    if not user_id:
+        flash('User management requires database authentication.')
+        return redirect(url_for('index'))
+    
+    if not user_management.user_has_role(user_id, 'admin'):
+        flash('Only administrators can manage users.')
+        return redirect(url_for('index'))
+    
+    user = user_management.get_user_by_id(uid)
+    if not user:
+        flash('User not found.')
+        return redirect(url_for('users_list'))
+    
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip() or None
+        password = request.form.get("password", "")
+        active = 1 if request.form.get("active") else 0
+        roles = request.form.getlist("roles")
+        
+        if not username:
+            flash('Username is required.')
+            return redirect(url_for('users_edit', uid=uid))
+        
+        # Update user
+        success = user_management.update_user(
+            uid, 
+            username=username, 
+            email=email, 
+            active=active,
+            password=password if password else None
+        )
+        
+        if success:
+            # Update roles
+            user_management.set_user_roles(uid, roles)
+            flash(f'User {username} updated successfully.')
+            return redirect(url_for('users_list'))
+        else:
+            flash(f'Failed to update user. Username may already exist.')
+    
+    all_roles = user_management.list_roles()
+    user_roles = user_management.get_user_role_names(uid)
+    return render_template('users/edit.html', user=user, all_roles=all_roles, user_roles=user_roles)
+
+@app.route("/users/delete/<int:uid>", methods=["POST"])
+@login_required
+def users_delete(uid):
+    """Delete a user - only accessible to admins."""
+    user_id = session.get("user_id")
+    if not user_id:
+        flash('User management requires database authentication.')
+        return redirect(url_for('index'))
+    
+    if not user_management.user_has_role(user_id, 'admin'):
+        flash('Only administrators can manage users.')
+        return redirect(url_for('index'))
+    
+    # Prevent deleting yourself
+    if uid == user_id:
+        flash('You cannot delete your own account.')
+        return redirect(url_for('users_list'))
+    
+    user = user_management.get_user_by_id(uid)
+    if user:
+        user_management.delete_user(uid)
+        flash(f'User {user["username"]} deleted.')
+    
+    return redirect(url_for('users_list'))
+
+@app.route("/users/profile", methods=["GET", "POST"])
+@login_required
+def users_profile():
+    """View and edit own profile."""
+    user_id = session.get("user_id")
+    if not user_id:
+        flash('Profile management requires database authentication.')
+        return redirect(url_for('index'))
+    
+    user = user_management.get_user_by_id(user_id)
+    if not user:
+        flash('User not found.')
+        return redirect(url_for('index'))
+    
+    if request.method == "POST":
+        email = request.form.get("email", "").strip() or None
+        password = request.form.get("password", "")
+        
+        # Update user
+        user_management.update_user(
+            user_id,
+            email=email,
+            password=password if password else None
+        )
+        flash('Profile updated successfully.')
+        return redirect(url_for('users_profile'))
+    
+    user_roles = user_management.get_user_role_names(user_id)
+    return render_template('users/profile.html', user=user, user_roles=user_roles)
 
 # Security: Add security headers
 @app.after_request
@@ -438,6 +719,12 @@ def add_security_headers(response):
     return response
 
 if __name__ == "__main__":
+    # Initialize User Management database
+    user_management.init_user_db()
+    # Migrate environment variable user to database
+    if user_management.migrate_env_user_to_db():
+        print(f"INFO: Migrated environment variable user '{USERNAME}' to database.")
+    
     # Initialize Disk Tools database
     disktool_core.init_db()
     # Start Disk Tools auto-mode worker

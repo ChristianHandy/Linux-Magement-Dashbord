@@ -5,6 +5,14 @@
   <h2>Manage Hosts</h2>
   <p><a class="btn" href="/dashboard">Back to Dashboard</a></p>
 
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
   <h3>Existing Hosts</h3>
   {% if hosts %}
     {% for name, h in hosts.items() %}
@@ -12,17 +20,20 @@
         <b>{{ name }}</b><br>
         Host: {{ h.host }}<br>
         User: {{ h.user }}<br><br>
-        <a class="btn" href="/hosts/edit/{{ name }}">Edit</a>
-        <a class="btn" href="/hosts/install_key/{{ name }}">Install SSH key</a>
-        <form action="/hosts/delete/{{ name }}" method="post" style="display:inline">
-          <button class="btn" type="submit">Delete</button>
-        </form>
+        {% if not current_user_id or 'operator' in current_user_roles or 'admin' in current_user_roles %}
+          <a class="btn" href="/hosts/edit/{{ name }}">Edit</a>
+          <a class="btn" href="/hosts/install_key/{{ name }}">Install SSH key</a>
+          <form action="/hosts/delete/{{ name }}" method="post" style="display:inline">
+            <button class="btn" type="submit" onclick="return confirm('Are you sure?')">Delete</button>
+          </form>
+        {% endif %}
       </div>
     {% endfor %}
   {% else %}
     <p>No hosts configured yet.</p>
   {% endif %}
 
+  {% if not current_user_id or 'operator' in current_user_roles or 'admin' in current_user_roles %}
   <h3>Add / Update Host</h3>
   <form method="post" class="card">
     <label>Display name</label><br>
@@ -33,4 +44,7 @@
     <input name="user" placeholder="username"><br><br>
     <button class="btn" type="submit">Save</button>
   </form>
+  {% else %}
+  <p><em>You need operator or admin role to manage hosts.</em></p>
+  {% endif %}
 </div>
