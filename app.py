@@ -6,6 +6,13 @@ import disktool_core
 from addon_loader import AddonManager
 from functools import wraps
 
+# Load environment variables from .env file if python-dotenv is available
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv is optional
+
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
 # Security: Use environment variables for credentials, generate secure secret key
