@@ -12,6 +12,34 @@
   {% endif %}
 {% endwith %}
 
+{% if update_notification %}
+<div class="card" style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); border: 2px solid #60a5fa;">
+  <h3 style="color: #dbeafe; margin-bottom: 0.5rem;">🔔 Dashboard Update Available!</h3>
+  <p style="color: #bfdbfe; margin-bottom: 1rem;">
+    <strong>{{ update_notification.description }}</strong><br>
+    Version: {{ update_notification.version }} ({{ update_notification.type }})
+  </p>
+  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+    {% if is_admin %}
+    <a class="btn" href="/dashboard_version/update" style="background: #059669;">
+      Update Now
+    </a>
+    {% endif %}
+    <a class="btn" href="/dashboard_version/check" style="background: #7c3aed;">
+      Check Again
+    </a>
+    {% if update_notification.url %}
+    <a class="btn" href="{{ update_notification.url }}" target="_blank" style="background: #475569;">
+      View on GitHub
+    </a>
+    {% endif %}
+    <a class="btn" href="/dashboard_version/dismiss" style="background: #64748b;">
+      Dismiss
+    </a>
+  </div>
+</div>
+{% endif %}
+
 <div class="card">
   <h3>System Update Manager</h3>
   <p>Monitor and update multiple Linux computers remotely via SSH</p>

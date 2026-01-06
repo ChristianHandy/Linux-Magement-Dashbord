@@ -58,6 +58,19 @@
       </p>
     </div>
 
+    <div style="margin-bottom: 1.5rem;">
+      <label style="display: flex; align-items: center; cursor: pointer;">
+        <input type="checkbox" name="dashboard_update_notifications" 
+               {% if settings.dashboard_update_notifications %}checked{% endif %}
+               style="margin-right: 0.5rem; width: 20px; height: 20px; cursor: pointer;">
+        <span style="font-weight: bold;">Enable Dashboard Update Notifications</span>
+      </label>
+      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
+        Get notified when a new version of the Linux Management Dashboard itself is available. 
+        The system will check for updates daily and notify you about new releases or commits.
+      </p>
+    </div>
+
     {% if settings.last_auto_update %}
     <div style="margin-bottom: 1.5rem; padding: 1rem; background: #1e293b; border-radius: 8px;">
       <strong>Last Automatic Update:</strong> {{ settings.last_auto_update }}

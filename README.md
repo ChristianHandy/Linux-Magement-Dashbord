@@ -283,6 +283,13 @@ Choose how often automatic updates should run:
 #### Update Notifications
 Enable or disable update status notifications displayed on the dashboard.
 
+#### Dashboard Update Notifications
+Enable or disable notifications for new versions of the Linux Management Dashboard itself. When enabled:
+- The system checks for new dashboard versions every 24 hours
+- Notifications appear for both official releases and new commits
+- Users can update the dashboard directly from the UI while preserving configurations
+- Only administrators can perform dashboard updates
+
 ### Update Types
 
 The dashboard now supports two types of updates:
@@ -317,7 +324,8 @@ Update settings are stored in `update_settings.json` with the following structur
   "automatic_updates_enabled": false,
   "update_frequency": "daily",
   "last_auto_update": null,
-  "notification_enabled": true
+  "notification_enabled": true,
+  "dashboard_update_notifications": true
 }
 ```
 
@@ -325,6 +333,90 @@ Update settings are stored in `update_settings.json` with the following structur
 The Update Dashboard displays the current automatic update status:
 - **Disabled**: Shows a neutral card indicating automatic updates are off
 - **Enabled**: Shows a green card with the configured frequency and last update time
+
+## Dashboard Self-Update Feature
+
+The Linux Management Dashboard includes a self-update feature that automatically notifies users when a new version of the dashboard itself is available.
+
+### Features
+
+- **Automatic Version Checking**: Checks for new dashboard versions every 24 hours
+- **Update Notifications**: Displays prominent notification banners when updates are available
+- **Support for Releases and Commits**: Detects both official GitHub releases and new commits
+- **Configuration Preservation**: Updates the dashboard while keeping all settings intact
+- **Admin-Only Updates**: Only administrators can perform dashboard updates for security
+
+### How It Works
+
+1. **Background Checking**: A background worker automatically checks the GitHub repository for new versions every 24 hours
+2. **Notification Display**: When an update is available, a blue notification banner appears on the main menu and dashboard pages
+3. **User Action**: Users can view the update details, check the GitHub release/commit, or update immediately
+4. **Safe Updates**: The update process preserves configuration files (hosts.json, users.db, update_settings.json, etc.)
+
+### Update Process
+
+1. Navigate to the main menu or dashboard
+2. If an update is available, you'll see a notification banner with:
+   - Update description (release name or commit message)
+   - Version identifier (tag or short SHA)
+   - Action buttons: "Update Now", "Check Again", "View on GitHub", "Dismiss"
+3. Click "Update Now" to proceed to the update page
+4. Review the important warnings and update options
+5. Choose to preserve or reset configuration files
+6. Click "Update Dashboard Now" to start the update
+7. Restart the application after the update completes
+
+### Routes
+
+- Check for updates: `/dashboard_version/check`
+- Update page: `/dashboard_version/update`
+- Dismiss notification: `/dashboard_version/dismiss`
+
+### Configuration
+
+Dashboard update notifications can be enabled/disabled in Update Settings:
+- Navigate to `/update_settings`
+- Toggle "Enable Dashboard Update Notifications"
+- This controls whether the system checks for and displays dashboard updates
+
+### Preserved Files
+
+When updating with "Preserve Configuration Files" option (recommended), these files are automatically backed up and restored:
+- `hosts.json` - Host configurations
+- `history.json` - Update history
+- `update_settings.json` - Update settings
+- `version_check.json` - Version check data
+- `users.db` - User database
+- `disks.db` - Disk management database
+- `.env` - Environment variables
+- `operations.db` - Operation history
+- `smart.db` - SMART data
+
+### GitHub Actions Integration
+
+The repository includes a GitHub Actions workflow (`.github/workflows/notify-version.yml`) that:
+- Triggers on pushes to main branch and published releases
+- Creates a notification summary in GitHub Actions
+- Provides update instructions for installed dashboards
+- Helps track when new versions are available
+
+### Manual Version Check
+
+To manually check for updates:
+1. Log in as an operator or administrator
+2. Navigate to the main menu (`/index`)
+3. If no notification is visible, go to `/dashboard_version/check`
+4. The system will immediately check for updates and display results
+
+### Security Notes
+
+- Only administrators can perform dashboard updates
+- The update process uses `git reset --hard` to ensure a clean update
+- Configuration files are backed up to `/tmp` before updates
+- The system validates the current branch and commit SHA
+- Updates are fetched from the official GitHub repository only
+
+
 
 ## Security
 
