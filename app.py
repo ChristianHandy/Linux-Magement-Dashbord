@@ -177,7 +177,19 @@ def dashboard():
     hosts = load_hosts()
     history = json.load(open("history.json"))
     status = {n: is_online(h["host"], h["user"]) for n, h in hosts.items()}
-    return render_template("update_dashboard.html", hosts=hosts, status=status, history=history)
+    
+    # Load update settings for display
+    settings = scheduler.load_update_settings()
+    
+    return render_template(
+        "update_dashboard.html", 
+        hosts=hosts, 
+        status=status, 
+        history=history,
+        auto_updates_enabled=settings.get("automatic_updates_enabled", False),
+        update_frequency=settings.get("update_frequency", "daily"),
+        last_auto_update=settings.get("last_auto_update")
+    )
 
 @app.route("/update/<name>")
 @login_required
@@ -199,6 +211,62 @@ def update(name):
 @login_required
 def progress(name):
     return render_template("progress.html", log=logs.get(name, []))
+
+# Update settings routes
+@app.route("/update_settings", methods=["GET", "POST"])
+@login_required
+def update_settings():
+    """Manage automatic update settings"""
+    # Require operator or admin role to modify settings
+    if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+        flash('You need operator or admin role to modify update settings.')
+        return redirect(url_for('dashboard'))
+    
+    if request.method == "POST":
+        settings = scheduler.load_update_settings()
+        
+        # Update settings from form
+        settings["automatic_updates_enabled"] = bool(request.form.get("automatic_updates_enabled"))
+        settings["update_frequency"] = request.form.get("update_frequency", "daily")
+        settings["notification_enabled"] = bool(request.form.get("notification_enabled"))
+        
+        # Validate frequency
+        if settings["update_frequency"] not in ["daily", "weekly", "monthly"]:
+            settings["update_frequency"] = "daily"
+        
+        # Save settings
+        scheduler.save_update_settings(settings)
+        
+        # Reconfigure scheduler
+        scheduler.configure_scheduler()
+        
+        flash('Update settings saved successfully')
+        return redirect(url_for('update_settings'))
+    
+    # GET request - display current settings
+    settings = scheduler.load_update_settings()
+    return render_template("update_settings.html", settings=settings)
+
+@app.route("/update_repo/<name>")
+@login_required
+def update_repo(name):
+    """Update from repository only, skip host configuration updates"""
+    # Require operator or admin role to perform updates
+    if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+        flash('You need operator or admin role to perform system updates.')
+        return redirect(url_for('dashboard'))
+    
+    hosts = load_hosts()
+    if name not in hosts:
+        flash(f'Host {name} not found')
+        return redirect(url_for('dashboard'))
+    
+    logs[name] = []
+    threading.Thread(
+        target=run_update,
+        args=(hosts[name]["host"], hosts[name]["user"], name, logs[name], True)
+    ).start()
+    return redirect(f"/progress/{name}")
 
 # Host management routes
 @app.route("/hosts", methods=["GET", "POST"])

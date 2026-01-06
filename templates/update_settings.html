@@ -1,0 +1,94 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/static/style.css">
+
+<div class="container">
+<h2>Automatic Update Settings</h2>
+
+<p><a class="btn" href="/dashboard">← Back to Dashboard</a></p>
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="card">
+  <h3>Automatic Update Configuration</h3>
+  <form method="POST" action="/update_settings">
+    <div style="margin-bottom: 1.5rem;">
+      <label style="display: flex; align-items: center; cursor: pointer;">
+        <input type="checkbox" name="automatic_updates_enabled" 
+               {% if settings.automatic_updates_enabled %}checked{% endif %}
+               style="margin-right: 0.5rem; width: 20px; height: 20px; cursor: pointer;">
+        <span style="font-weight: bold;">Enable Automatic Updates</span>
+      </label>
+      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
+        When enabled, the system will automatically update all configured hosts at the specified frequency.
+        Updates will run in the background without manual intervention.
+      </p>
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+      <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">
+        Update Frequency
+      </label>
+      <select name="update_frequency" 
+              style="width: 100%; padding: 0.6rem; background: #1e293b; color: #e5e7eb; border: 1px solid #334155; border-radius: 8px; font-size: 1rem;">
+        <option value="daily" {% if settings.update_frequency == 'daily' %}selected{% endif %}>Daily</option>
+        <option value="weekly" {% if settings.update_frequency == 'weekly' %}selected{% endif %}>Weekly</option>
+        <option value="monthly" {% if settings.update_frequency == 'monthly' %}selected{% endif %}>Monthly</option>
+      </select>
+      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
+        Choose how often automatic updates should run. Daily updates provide the most security but may cause interruptions.
+        Weekly or monthly updates are better for stable production environments.
+      </p>
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+      <label style="display: flex; align-items: center; cursor: pointer;">
+        <input type="checkbox" name="notification_enabled" 
+               {% if settings.notification_enabled %}checked{% endif %}
+               style="margin-right: 0.5rem; width: 20px; height: 20px; cursor: pointer;">
+        <span style="font-weight: bold;">Enable Update Notifications</span>
+      </label>
+      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
+        Show notifications about update status and completion in the dashboard.
+      </p>
+    </div>
+
+    {% if settings.last_auto_update %}
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #1e293b; border-radius: 8px;">
+      <strong>Last Automatic Update:</strong> {{ settings.last_auto_update }}
+    </div>
+    {% endif %}
+
+    <button type="submit" class="btn" style="margin-right: 0.5rem;">Save Settings</button>
+    <a class="btn" href="/dashboard" style="background: #475569;">Cancel</a>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Update Controls</h3>
+  <p>
+    Use these controls to manually trigger updates or configure update behavior for each host.
+  </p>
+  
+  <div style="margin-top: 1rem;">
+    <a class="btn" href="/dashboard" style="margin-right: 0.5rem;">View Update Dashboard</a>
+    <a class="btn" href="/hosts" style="background: #059669;">Manage Hosts</a>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Important Notes</h3>
+  <ul style="line-height: 1.8; color: #cbd5e1;">
+    <li><strong>Automatic updates require operator or admin role</strong> - Viewers cannot enable automatic updates</li>
+    <li><strong>Repository-only updates</strong> - Use the "Repo Update" button on the dashboard to update packages while keeping configuration files unchanged</li>
+    <li><strong>Full updates</strong> - Use the standard "Update" button to perform complete system updates including configuration files</li>
+    <li><strong>Network requirements</strong> - All configured hosts must be online and accessible via SSH for automatic updates to work</li>
+    <li><strong>Security</strong> - Ensure SSH keys are properly configured for passwordless authentication</li>
+  </ul>
+</div>
+</div>

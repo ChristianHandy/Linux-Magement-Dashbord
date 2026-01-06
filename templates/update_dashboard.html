@@ -4,7 +4,33 @@
 <div class="container">
 <h2>Linux Update Dashboard</h2>
 
-<p><a class="btn" href="/hosts">Manage Hosts</a></p>
+<p>
+  <a class="btn" href="/hosts">Manage Hosts</a>
+  <a class="btn" href="/update_settings" style="background: #059669;">Update Settings</a>
+</p>
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<!-- Automatic Update Status Card -->
+<div class="card" style="background: {% if auto_updates_enabled %}#065f46{% else %}#1e293b{% endif %}; border: 1px solid {% if auto_updates_enabled %}#10b981{% else %}#334155{% endif %};">
+  <h3>Automatic Updates: {% if auto_updates_enabled %}✓ Enabled{% else %}✗ Disabled{% endif %}</h3>
+  <p>
+    {% if auto_updates_enabled %}
+      Automatic updates are running <strong>{{ update_frequency }}</strong>.
+      {% if last_auto_update %}
+        <br>Last automatic update: {{ last_auto_update }}
+      {% endif %}
+    {% else %}
+      Automatic updates are currently disabled. Visit <a href="/update_settings" style="color: #60a5fa;">Update Settings</a> to enable.
+    {% endif %}
+  </p>
+</div>
 
 {% for name in hosts %}
 <div class="card">
@@ -13,8 +39,9 @@
   <span class="{{ 'status-online' if status[name] else 'status-offline' }}">
     {{ 'Online' if status[name] else 'Offline' }}
   </span><br><br>
-  <a class="btn" href="/update/{{ name }}">Update</a>
-  <a class="btn" href="/hosts/edit/{{ name }}">Edit</a>
+  <a class="btn" href="/update/{{ name }}">Full Update</a>
+  <a class="btn" href="/update_repo/{{ name }}" style="background: #7c3aed;" title="Update packages from repository while keeping host configuration files unchanged">Repo Update</a>
+  <a class="btn" href="/hosts/edit/{{ name }}" style="background: #475569;">Edit</a>
 </div>
 {% endfor %}
 
@@ -22,6 +49,9 @@
 {% for h in history %}
 <div class="card">
   {{ h.time }} — {{ h.host }} — {{ h.status }}
+  {% if h.type %}
+    <span style="color: #94a3b8;"> ({{ h.type }})</span>
+  {% endif %}
 </div>
 {% endfor %}
 </div>
