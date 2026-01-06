@@ -1,0 +1,56 @@
+name: Notify New Version Available
+
+on:
+  push:
+    branches:
+      - main
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    name: Version Notification
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Get commit info
+        id: commit_info
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            echo "type=release" >> $GITHUB_OUTPUT
+            echo "version=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+            echo "description=${{ github.event.release.name }}" >> $GITHUB_OUTPUT
+            echo "url=${{ github.event.release.html_url }}" >> $GITHUB_OUTPUT
+          else
+            echo "type=commit" >> $GITHUB_OUTPUT
+            echo "version=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+            COMMIT_MSG=$(git log -1 --pretty=%B | head -n 1)
+            echo "description=$COMMIT_MSG" >> $GITHUB_OUTPUT
+            echo "url=https://github.com/${{ github.repository }}/commit/${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Create notification summary
+        run: |
+          echo "## 🚀 New Dashboard Version Available" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Type:** ${{ steps.commit_info.outputs.type }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.commit_info.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Description:** ${{ steps.commit_info.outputs.description }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Update Instructions:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Log in to your dashboard as an administrator" >> $GITHUB_STEP_SUMMARY
+          echo "2. Navigate to the main menu or dashboard page" >> $GITHUB_STEP_SUMMARY
+          echo "3. Look for the update notification banner" >> $GITHUB_STEP_SUMMARY
+          echo "4. Click 'Update Now' to update the dashboard" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Or check manually at: ${{ steps.commit_info.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Note: Installed dashboards will automatically check for updates every 24 hours._" >> $GITHUB_STEP_SUMMARY
+          echo "_To update immediately, visit: Settings > Update Settings > Check for Dashboard Updates_" >> $GITHUB_STEP_SUMMARY

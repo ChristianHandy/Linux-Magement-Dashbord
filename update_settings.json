@@ -2,5 +2,6 @@
   "automatic_updates_enabled": true,
   "update_frequency": "weekly",
   "last_auto_update": null,
-  "notification_enabled": true
+  "notification_enabled": true,
+  "dashboard_update_notifications": true
 }

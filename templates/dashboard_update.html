@@ -1,0 +1,113 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/static/style.css">
+
+<div class="container">
+<h2>Update Linux Management Dashboard</h2>
+
+<p><a class="btn" href="/index">← Back to Main Menu</a></p>
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="card" style="background: #dc2626; border: 1px solid #ef4444;">
+  <h3 style="color: #fef2f2;">⚠️ Important Warning</h3>
+  <p style="color: #fecaca;">
+    You are about to update the Linux Management Dashboard to the latest version.
+    This will pull the latest code from the GitHub repository and may require restarting the application.
+  </p>
+  <ul style="line-height: 1.8; color: #fecaca;">
+    <li><strong>The application will need to be restarted</strong> after the update completes</li>
+    <li><strong>Active operations may be interrupted</strong> - ensure no critical tasks are running</li>
+    <li><strong>Configuration files will be preserved</strong> if the option below is checked</li>
+    <li><strong>Only administrators can perform this action</strong></li>
+  </ul>
+</div>
+
+{% if version_data.update_available %}
+<div class="card">
+  <h3>Available Update</h3>
+  <p>
+    <strong>Update Type:</strong> {{ version_data.update_type|capitalize }}<br>
+    <strong>Version:</strong> {{ version_data.latest_version }}<br>
+    <strong>Description:</strong> {{ version_data.update_description }}
+  </p>
+  {% if version_data.update_url %}
+  <p>
+    <a href="{{ version_data.update_url }}" target="_blank" class="btn" style="background: #475569;">
+      View Changes on GitHub
+    </a>
+  </p>
+  {% endif %}
+</div>
+{% else %}
+<div class="card">
+  <h3>No Update Available</h3>
+  <p>
+    The dashboard is currently up to date. You can check for updates manually or wait for the automatic check.
+  </p>
+  <a class="btn" href="/dashboard_version/check">Check for Updates</a>
+</div>
+{% endif %}
+
+{% if version_data.update_available %}
+<div class="card">
+  <h3>Update Options</h3>
+  <form method="POST" action="/dashboard_version/update" onsubmit="return confirm('Are you sure you want to update the dashboard? This will require restarting the application.');">
+    <div style="margin-bottom: 1.5rem;">
+      <label style="display: flex; align-items: center; cursor: pointer;">
+        <input type="radio" name="preserve_configs" value="yes" checked
+               style="margin-right: 0.5rem; width: 20px; height: 20px; cursor: pointer;">
+        <span style="font-weight: bold;">Preserve Configuration Files (Recommended)</span>
+      </label>
+      <p style="margin: 0.5rem 0 0 2.5rem; color: #94a3b8; font-size: 0.9rem;">
+        Keep existing configuration files (hosts.json, update_settings.json, users.db, etc.)
+      </p>
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+      <label style="display: flex; align-items: center; cursor: pointer;">
+        <input type="radio" name="preserve_configs" value="no"
+               style="margin-right: 0.5rem; width: 20px; height: 20px; cursor: pointer;">
+        <span style="font-weight: bold;">Clean Update (Reset Configurations)</span>
+      </label>
+      <p style="margin: 0.5rem 0 0 2.5rem; color: #94a3b8; font-size: 0.9rem;">
+        Replace all files with fresh versions from the repository. <strong style="color: #ef4444;">This will delete your configuration!</strong>
+      </p>
+    </div>
+
+    <button type="submit" class="btn" style="background: #dc2626;">
+      Update Dashboard Now
+    </button>
+    <a class="btn" href="/index" style="background: #475569; margin-left: 0.5rem;">
+      Cancel
+    </a>
+  </form>
+</div>
+{% endif %}
+
+<div class="card">
+  <h3>Update Process</h3>
+  <ol style="line-height: 1.8; color: #cbd5e1;">
+    <li>The system will backup your configuration files (if "Preserve Configuration Files" is selected)</li>
+    <li>Latest code will be fetched from the GitHub repository</li>
+    <li>Local repository will be updated to the latest version</li>
+    <li>Configuration files will be restored from backup</li>
+    <li>You will need to restart the application manually to complete the update</li>
+  </ol>
+  
+  <h4 style="margin-top: 1.5rem;">To restart the application:</h4>
+  <pre style="background: #1e293b; padding: 1rem; border-radius: 8px; overflow-x: auto;">
+# Stop the current process (Ctrl+C)
+# Then restart with:
+sudo -E python3 app.py
+
+# Or if running as a service:
+sudo systemctl restart linux-dashboard
+  </pre>
+</div>
+</div>

@@ -10,3 +10,6 @@ apscheduler>=3.10.4
 # For environment variable loading (optional but recommended)
 python-dotenv>=1.0.0
 
+# HTTP requests for version checking
+requests>=2.31.0
+

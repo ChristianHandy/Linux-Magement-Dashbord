@@ -6,6 +6,7 @@ import disktool_core
 from addon_loader import AddonManager
 from functools import wraps
 import user_management
+import version_manager
 
 # Load environment variables from .env file if python-dotenv is available
 try:
@@ -53,6 +54,13 @@ def inject_user_context():
         current_user_roles=user_roles,
         is_admin=is_admin
     )
+
+# Template function for version update notifications
+@app.context_processor
+def inject_version_notification():
+    """Make version update notifications available in all templates."""
+    notification = version_manager.get_update_notification()
+    return dict(update_notification=notification)
 
 logs = {}
 
@@ -229,6 +237,7 @@ def update_settings():
         settings["automatic_updates_enabled"] = bool(request.form.get("automatic_updates_enabled"))
         settings["update_frequency"] = request.form.get("update_frequency", "daily")
         settings["notification_enabled"] = bool(request.form.get("notification_enabled"))
+        settings["dashboard_update_notifications"] = bool(request.form.get("dashboard_update_notifications"))
         
         # Validate frequency
         if settings["update_frequency"] not in ["daily", "weekly", "monthly"]:
@@ -246,6 +255,56 @@ def update_settings():
     # GET request - display current settings
     settings = scheduler.load_update_settings()
     return render_template("update_settings.html", settings=settings)
+
+# Dashboard version update routes
+@app.route("/dashboard_version/check")
+@login_required
+def check_dashboard_version():
+    """Check for dashboard updates"""
+    # Require operator or admin role to check for updates
+    if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+        flash('You need operator or admin role to check for updates.')
+        return redirect(url_for('index'))
+    
+    version_data = version_manager.check_for_updates()
+    
+    if version_data.get("update_available"):
+        flash(f'Dashboard update available: {version_data.get("update_description")}')
+    else:
+        flash('Dashboard is up to date!')
+    
+    return redirect(url_for('index'))
+
+@app.route("/dashboard_version/dismiss")
+@login_required
+def dismiss_dashboard_notification():
+    """Dismiss the current update notification"""
+    version_manager.dismiss_notification()
+    return redirect(request.referrer or url_for('index'))
+
+@app.route("/dashboard_version/update", methods=["GET", "POST"])
+@login_required
+def update_dashboard():
+    """Update the dashboard to the latest version"""
+    # Require admin role to update dashboard
+    if session.get("user_id") and not current_user_has_role('admin'):
+        flash('Only administrators can update the dashboard.')
+        return redirect(url_for('index'))
+    
+    if request.method == "POST":
+        preserve_configs = request.form.get("preserve_configs", "yes") == "yes"
+        success, message = version_manager.perform_self_update(preserve_configs)
+        
+        if success:
+            flash(message, 'success')
+        else:
+            flash(message, 'error')
+        
+        return redirect(url_for('index'))
+    
+    # GET request - show confirmation page
+    version_data = version_manager.load_version_data()
+    return render_template("dashboard_update.html", version_data=version_data)
 
 @app.route("/update_repo/<name>")
 @login_required
@@ -800,6 +859,23 @@ if __name__ == "__main__":
     
     # Configure automatic update scheduler
     scheduler.configure_scheduler()
+    
+    # Background task to check for dashboard version updates
+    def version_check_worker():
+        """Background worker to periodically check for dashboard updates"""
+        import time
+        while True:
+            try:
+                settings = scheduler.load_update_settings()
+                if settings.get("dashboard_update_notifications", True):
+                    if version_manager.should_check_for_updates(check_interval_hours=24):
+                        version_manager.check_for_updates()
+            except Exception as e:
+                print(f"Error checking for dashboard updates: {e}")
+            # Sleep for 1 hour before checking again
+            time.sleep(3600)
+    
+    threading.Thread(target=version_check_worker, daemon=True).start()
     
     # Security: Disable debug mode in production
     debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
