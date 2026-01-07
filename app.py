@@ -639,6 +639,11 @@ def render_plugin_page(plugin, device):
         flash(f'Plugin {plugin} not found')
         return redirect(url_for('disks_index'))
     
+    # Special handling for remote_disk_plugin to pass remotes data
+    if plugin == 'remote_disk_plugin':
+        remotes = disktool_core.list_remotes()
+        return render_template(f'addons/{plugin}.html', device=device, remotes=remotes)
+    
     return render_template(f'addons/{plugin}.html', device=device)
 
 @app.route("/disks/remotes", methods=['GET', 'POST'])

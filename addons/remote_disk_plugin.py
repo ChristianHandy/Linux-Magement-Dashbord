@@ -68,10 +68,15 @@ def execute_remote_command(host, port, username, command):
     Execute a command on a remote host via SSH.
     Returns the output as a string or None if failed.
     
-    Security Note: Uses SSH key authentication. Assumes key is already set up.
+    Security Note: Uses AutoAddPolicy which accepts any host key, making this 
+    vulnerable to MITM attacks. This is consistent with the existing implementation
+    in app.py. For production use, consider using WarningPolicy and maintaining 
+    a known_hosts file.
     """
     try:
         ssh = paramiko.SSHClient()
+        # Security Note: AutoAddPolicy accepts any host key, making this vulnerable to MITM attacks.
+        # For production, use WarningPolicy or maintain a known_hosts file.
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(host, port=port, username=username, timeout=10)
         

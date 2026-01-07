@@ -1,0 +1,41 @@
+{% extends 'disks/base.html' %}
+{% block title %}Remote Disk Manager – {{ device }}{% endblock %}
+{% block content %}
+<div class='container mt-4'>
+  <h1>Remote Disk Manager</h1>
+  <p>Manage disks on remote systems via SSH</p>
+  <p>Local device context: <strong>{{ device }}</strong></p>
+
+  <div class="card mb-4">
+    <div class="card-header">
+      <h5>Available Remote Systems</h5>
+    </div>
+    <div class="card-body">
+      {% if remotes %}
+        <div class="list-group">
+          {% for remote in remotes %}
+          <div class="list-group-item">
+            <div class="d-flex w-100 justify-content-between">
+              <h6 class="mb-1">{{ remote.name }}</h6>
+              <small>{{ remote.host }}:{{ remote.port }}</small>
+            </div>
+            <div class="mt-2">
+              <a href="{{ url_for('remote_disk_list', remote_id=remote.id) }}" class="btn btn-sm btn-primary">
+                View Disks
+              </a>
+              <a href="{{ url_for('remote_disk_sync', remote_id=remote.id) }}" class="btn btn-sm btn-success">
+                Sync Disks
+              </a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-muted">No remote systems configured. Add remotes in <a href="{{ url_for('remotes') }}">Remote Management</a>.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <a href='{{ url_for('disks_index') }}' class='btn btn-secondary'>Back to Disk Overview</a>
+</div>
+{% endblock %}
