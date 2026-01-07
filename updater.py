@@ -4,7 +4,7 @@ import logging
 import paramiko
 import time
 
-SUPPORTED_DISTRIBUTIONS = ['ubuntu', 'debian', 'fedora', 'centos']
+SUPPORTED_DISTRIBUTIONS = ['ubuntu', 'debian', 'fedora', 'centos', 'arch']
 
 def run_update(host, user, name, log_list, repo_only=False):
     """
@@ -29,10 +29,14 @@ def run_update(host, user, name, log_list, repo_only=False):
         log(f"Connecting to {name} ({host})...")
         
         # Create SSH client
+        # Note: Using AutoAddPolicy for convenience, but this is a security risk
+        # as it automatically accepts unknown host keys (vulnerable to MITM attacks).
+        # For production use, implement proper host key verification.
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         
-        # Connect to the remote host
+        # Connect to the remote host using SSH key authentication
+        # The SSH key should be configured beforehand (see "Install SSH key" feature)
         ssh.connect(host, username=user, timeout=30)
         log(f"Connected to {name}")
         
@@ -84,8 +88,9 @@ def run_update(host, user, name, log_list, repo_only=False):
                 log("Running full system update...")
         
         else:
-            log(f"Warning: Unsupported distribution '{distro}'. Attempting generic update...")
-            update_cmd = "sudo apt-get update && sudo apt-get upgrade -y || sudo yum update -y || sudo dnf upgrade -y || sudo pacman -Syu --noconfirm"
+            log(f"✗ Unsupported distribution '{distro}'")
+            log("Supported distributions: Ubuntu, Debian, Fedora, CentOS, Arch")
+            return
         
         # Execute the update command
         log("Executing update command...")
