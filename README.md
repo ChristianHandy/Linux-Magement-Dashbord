@@ -220,6 +220,14 @@ The dashboard includes a powerful plugin system that allows you to extend disk m
 
 **Note:** Only administrators can install or uninstall plugins. All users can view installed plugins.
 
+### Addon Paths
+
+Addon pages are accessible at `/disks/addons/<plugin_name>/<device>`. For backward compatibility, the old path `/addons/<plugin_name>/<device>` will automatically redirect to the correct location.
+
+**Examples:**
+- Correct path: `/disks/addons/example_plugin/sda`
+- Legacy path (redirects): `/addons/example_plugin/sda`
+
 ### Plugin Manager Features
 
 **Installed Plugins Section:**

@@ -706,6 +706,12 @@ def render_plugin_page(plugin, device):
     
     return render_template(f'addons/{plugin}.html', device=device)
 
+@app.route("/addons/<plugin>/<device>")
+@login_required
+def redirect_addon_page(plugin, device):
+    """Redirect old /addons/ paths to /disks/addons/ for backward compatibility"""
+    return redirect(url_for('render_plugin_page', plugin=plugin, device=device))
+
 @app.route("/disks/remotes", methods=['GET', 'POST'])
 @login_required
 def remotes():

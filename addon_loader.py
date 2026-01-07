@@ -39,7 +39,7 @@ class AddonManager:
 
                     # Device-Button automatisch als Hook registrieren
                     def make_button(plugin_name):
-                        return lambda dev: f'<a class="btn btn-sm btn-outline-secondary" href="/addons/{plugin_name}/{dev}">{plugin_name}</a>'
+                        return lambda dev: f'<a class="btn btn-sm btn-outline-secondary" href="/disks/addons/{plugin_name}/{dev}">{plugin_name}</a>'
                     self.hooks.setdefault("device_buttons", []).append(make_button(modname))
 
                 if hasattr(mod, "addon_meta"):
