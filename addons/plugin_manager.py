@@ -20,11 +20,12 @@ def sanitize_path(base_dir, filename):
     Safely construct and validate a path within the base directory.
     
     Args:
-        base_dir: The base directory (e.g., 'addons', 'templates/addons')
-        filename: The filename to join with the base directory
+        base_dir (str): The base directory (e.g., 'addons', 'templates/addons')
+        filename (str): The filename to join with the base directory
         
     Returns:
-        Path object if valid, None if the path would escape the base directory
+        Path: Path object if valid
+        None: If the path would escape the base directory or if an error occurs
     """
     try:
         # Convert base_dir to absolute path

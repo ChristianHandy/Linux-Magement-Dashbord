@@ -160,9 +160,10 @@ def test_path_sanitization():
         from addons import plugin_manager
         
         # Test valid paths
-        valid_path = plugin_manager.sanitize_path('addons', 'test_plugin.py')
+        base_dir = 'addons'
+        valid_path = plugin_manager.sanitize_path(base_dir, 'test_plugin.py')
         assert valid_path is not None, "Valid path rejected"
-        assert 'addons' in str(valid_path), "Valid path doesn't contain base directory"
+        assert base_dir in str(valid_path), "Valid path doesn't contain base directory"
         assert 'test_plugin.py' in str(valid_path), "Valid path doesn't contain filename"
         
         # Test path traversal attacks
@@ -176,12 +177,12 @@ def test_path_sanitization():
             'addons/../../etc/passwd',
         ]
         
+        base = Path(base_dir).resolve()
         for attempt in traversal_attempts:
-            result = plugin_manager.sanitize_path('addons', attempt)
+            result = plugin_manager.sanitize_path(base_dir, attempt)
             # Path traversal should either return None or a path still within addons
             if result is not None:
                 # If a result is returned, verify it's still within the base directory using secure method
-                base = Path('addons').resolve()
                 try:
                     result.relative_to(base)
                     # If we get here, the path is within base (which is acceptable)
@@ -190,14 +191,14 @@ def test_path_sanitization():
                     assert False, f"Path traversal not blocked: {attempt} -> {result}"
         
         # Test with templates directory
-        valid_template = plugin_manager.sanitize_path('templates/addons', 'test.html')
+        template_base = 'templates/addons'
+        valid_template = plugin_manager.sanitize_path(template_base, 'test.html')
         assert valid_template is not None, "Valid template path rejected"
         
         # Test absolute path attempts
         if os.name != 'nt':  # Unix-like systems
-            abs_path_result = plugin_manager.sanitize_path('addons', '/etc/passwd')
+            abs_path_result = plugin_manager.sanitize_path(base_dir, '/etc/passwd')
             if abs_path_result is not None:
-                base = Path('addons').resolve()
                 try:
                     abs_path_result.relative_to(base)
                     # If we get here, it's contained (acceptable)
