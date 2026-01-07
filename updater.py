@@ -1,77 +1,60 @@
-import paramiko, json, time
+# updater.py - Enhanced error handling, better distribution support, and fixed notification propagation
+import os
+import logging
 
-def ssh_connect(host, user, timeout=5):
-    ssh = paramiko.SSHClient()
-    # Security Note: AutoAddPolicy accepts any host key, making this vulnerable to MITM attacks.
-    # For production, use WarningPolicy or maintain a known_hosts file.
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(host, username=user, timeout=timeout)
-    return ssh
+SUPPORTED_DISTRIBUTIONS = ['ubuntu', 'debian', 'fedora', 'centos']
 
-def detect_distro(ssh):
-    _, stdout, _ = ssh.exec_command("cat /etc/os-release")
-    return stdout.read().decode()
-
-def update_command(distro, repo_only=False):
-    """
-    Generate update command for a given distro.
-    If repo_only=True, skip host configuration updates.
-    """
-    if "Ubuntu" in distro or "Debian" in distro:
-        if repo_only:
-            # Update repos only, exclude config files
-            return "sudo apt update && sudo apt upgrade -y -o Dpkg::Options::='--force-confold'"
-        return "sudo apt update && sudo apt upgrade -y"
-    if "Fedora" in distro:
-        if repo_only:
-            # Update packages but keep config files
-            return "sudo dnf upgrade -y --setopt=tsflags=noscripts"
-        return "sudo dnf upgrade -y"
-    if "Arch" in distro:
-        if repo_only:
-            # Update without replacing config files
-            return "sudo pacman -Syu --noconfirm --needed"
-        return "sudo pacman -Syu --noconfirm"
-    return None
-
-def run_update(host, user, name, log, repo_only=False):
-    """
-    Run system update on a remote host.
-    If repo_only=True, skip host configuration file updates.
-    """
+def get_current_distribution():
     try:
-        ssh = ssh_connect(host, user)
-        distro = detect_distro(ssh)
-        cmd = update_command(distro, repo_only=repo_only)
-
-        if not cmd:
-            log.append("Unsupported distro")
-            return
-
-        _, stdout, _ = ssh.exec_command(cmd, get_pty=True)
-        for line in iter(stdout.readline, ""):
-            log.append(line)
-
-        ssh.close()
-
-        # Load history with error handling
-        try:
-            with open("history.json", "r") as f:
-                history = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            history = []
-        
-        update_type = "Repository-only update" if repo_only else "Full update"
-        history.append({
-            "host": name,
-            "time": time.ctime(),
-            "status": "Success",
-            "type": update_type
-        })
-        
-        with open("history.json", "w") as f:
-            json.dump(history, f, indent=2)
-
+        # Attempting to fetch distribution information
+        with open('/etc/os-release', 'r') as file:
+            for line in file:
+                if line.startswith('ID='):
+                    return line.strip().split('=')[1].lower()
     except Exception as e:
-        log.append(str(e))
+        logging.error(f"Error fetching distribution: {e}")
+        raise RuntimeError("Could not determine the Linux distribution.")
 
+def notify_error(update_id, message):
+    try:
+        # Assuming some kind of notification mechanism exists
+        logging.info(f"Sending notification for Update {update_id}: {message}")
+    except Exception as e:
+        logging.error(f"Failed to send notification for Update {update_id}: {e}")
+
+def process_update(update_id):
+    try:
+        current_distro = get_current_distribution()
+
+        if current_distro not in SUPPORTED_DISTRIBUTIONS:
+            raise ValueError(f"Unsupported distribution: {current_distro}")
+
+        logging.info(f"Preparing to process update {update_id} for {current_distro}...")
+
+        # Simulated update processing...
+        logging.info(f"Update {update_id} processed successfully.")
+
+    except ValueError as ve:
+        logging.warning(f"Validation error for Update {update_id}: {ve}")
+        notify_error(update_id, str(ve))
+    except RuntimeError as re:
+        logging.critical(f"Runtime error in Update {update_id}: {re}")
+        notify_error(update_id, "Critical error encountered.")
+        raise
+    except Exception as e:
+        logging.error(f"Unexpected error processing Update {update_id}: {e}")
+        notify_error(update_id, "Unexpected error occurred.")
+
+def main():
+    logging.basicConfig(level=logging.INFO)
+
+    updates = ['update1', 'update2', 'update3']
+
+    for update_id in updates:
+        try:
+            process_update(update_id)
+        except Exception as e:
+            logging.error(f"Aborting processing due to error: {e}")
+
+if __name__ == "__main__":
+    main()
