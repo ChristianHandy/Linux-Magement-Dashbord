@@ -1,8 +1,125 @@
 # updater.py - Enhanced error handling, better distribution support, and fixed notification propagation
 import os
 import logging
+import paramiko
+import time
 
 SUPPORTED_DISTRIBUTIONS = ['ubuntu', 'debian', 'fedora', 'centos']
+
+def run_update(host, user, name, log_list, repo_only=False):
+    """
+    Run system update on a remote host via SSH.
+    
+    Args:
+        host: Hostname or IP address of the remote system
+        user: SSH username
+        name: Display name for the host (used in logs)
+        log_list: List to append log messages to
+        repo_only: If True, only update packages from repositories without modifying config files
+    """
+    def log(msg):
+        """Helper function to log messages"""
+        timestamp = time.strftime("%H:%M:%S")
+        log_msg = f"[{timestamp}] {msg}"
+        print(log_msg)
+        log_list.append(log_msg)
+    
+    ssh = None
+    try:
+        log(f"Connecting to {name} ({host})...")
+        
+        # Create SSH client
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        # Connect to the remote host
+        ssh.connect(host, username=user, timeout=30)
+        log(f"Connected to {name}")
+        
+        # Detect the distribution
+        log("Detecting Linux distribution...")
+        stdin, stdout, stderr = ssh.exec_command("cat /etc/os-release | grep '^ID=' | cut -d'=' -f2 | tr -d '\"'")
+        distro = stdout.read().decode().strip().lower()
+        log(f"Detected distribution: {distro}")
+        
+        # Determine the update commands based on distribution and update type
+        if distro in ['ubuntu', 'debian']:
+            if repo_only:
+                # Repository-only update for Debian/Ubuntu (preserve config files)
+                update_cmd = "sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::='--force-confold'"
+                log("Running repository-only update (preserving config files)...")
+            else:
+                # Full system update for Debian/Ubuntu
+                update_cmd = "sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && sudo DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y"
+                log("Running full system update...")
+        
+        elif distro == 'fedora':
+            if repo_only:
+                # Repository-only update for Fedora (preserve config files)
+                update_cmd = "sudo dnf upgrade -y --setopt=tsflags=noscripts"
+                log("Running repository-only update (preserving config files)...")
+            else:
+                # Full system update for Fedora
+                update_cmd = "sudo dnf upgrade -y"
+                log("Running full system update...")
+        
+        elif distro == 'centos':
+            if repo_only:
+                # Repository-only update for CentOS (preserve config files)
+                update_cmd = "sudo yum update -y --setopt=tsflags=noscripts"
+                log("Running repository-only update (preserving config files)...")
+            else:
+                # Full system update for CentOS
+                update_cmd = "sudo yum update -y"
+                log("Running full system update...")
+        
+        elif distro == 'arch':
+            if repo_only:
+                # Repository-only update for Arch (skip already installed packages)
+                update_cmd = "sudo pacman -Syu --noconfirm --needed"
+                log("Running repository-only update...")
+            else:
+                # Full system update for Arch
+                update_cmd = "sudo pacman -Syu --noconfirm"
+                log("Running full system update...")
+        
+        else:
+            log(f"Warning: Unsupported distribution '{distro}'. Attempting generic update...")
+            update_cmd = "sudo apt-get update && sudo apt-get upgrade -y || sudo yum update -y || sudo dnf upgrade -y || sudo pacman -Syu --noconfirm"
+        
+        # Execute the update command
+        log("Executing update command...")
+        stdin, stdout, stderr = ssh.exec_command(update_cmd, get_pty=True)
+        
+        # Read output in real-time
+        while True:
+            line = stdout.readline()
+            if not line:
+                break
+            log(line.rstrip())
+        
+        # Check exit status
+        exit_status = stdout.channel.recv_exit_status()
+        
+        if exit_status == 0:
+            log(f"✓ Update completed successfully for {name}")
+        else:
+            log(f"✗ Update finished with exit code {exit_status}")
+            # Read any error messages
+            errors = stderr.read().decode().strip()
+            if errors:
+                log(f"Errors: {errors}")
+        
+    except paramiko.AuthenticationException:
+        log(f"✗ Authentication failed for {name}. Check SSH keys or credentials.")
+    except paramiko.SSHException as e:
+        log(f"✗ SSH error connecting to {name}: {str(e)}")
+    except Exception as e:
+        log(f"✗ Error updating {name}: {str(e)}")
+    finally:
+        if ssh:
+            ssh.close()
+            log(f"Disconnected from {name}")
 
 def get_current_distribution():
     try:
