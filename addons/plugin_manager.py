@@ -3,6 +3,7 @@ import requests
 import os
 import re
 from pathlib import Path
+from functools import wraps
 
 blueprint = Blueprint('plugin_manager', __name__, url_prefix='/pluginmanager')
 
@@ -13,6 +14,19 @@ addon_meta = {
 
 # Default plugin repository (GitHub repo or API endpoint)
 REMOTE_PLUGIN_REPO = "https://raw.githubusercontent.com/ChristianHandy/Linux-Management-Dashboard-Plugins/main/plugins.json"
+
+def login_required(f):
+    """Decorator to require login - uses new user management system."""
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        # Check new user_id session first
+        if session.get("user_id"):
+            return f(*args, **kwargs)
+        # Fallback to old login session for backward compatibility
+        if session.get("login"):
+            return f(*args, **kwargs)
+        return redirect(url_for('login', next=request.path))
+    return wrapped
 
 def current_user_has_role(*roles):
     """Check if the current logged-in user has any of the specified roles."""
@@ -30,6 +44,7 @@ def register(app, core):
     app.register_blueprint(blueprint)
 
 @blueprint.route('/')
+@login_required
 def plugin_manager_index():
     mgr = getattr(current_app, 'addon_mgr', None)
     installed_plugins = mgr.status if mgr else []
@@ -63,11 +78,13 @@ def plugin_manager_index():
                          is_admin=is_admin)
 
 @blueprint.route('/status.json')
+@login_required
 def plugin_manager_json():
     mgr = getattr(current_app, 'addon_mgr', None)
     return jsonify(mgr.status if mgr else [])
 
 @blueprint.route('/install/<plugin_id>', methods=['POST'])
+@login_required
 def install_plugin(plugin_id):
     """Install a plugin from the remote repository"""
     # Require admin role to install plugins
@@ -127,6 +144,7 @@ def install_plugin(plugin_id):
     return redirect(url_for('plugin_manager.plugin_manager_index'))
 
 @blueprint.route('/uninstall/<plugin_file>', methods=['POST'])
+@login_required
 def uninstall_plugin(plugin_file):
     """Uninstall (delete) a plugin"""
     # Require admin role to uninstall plugins
