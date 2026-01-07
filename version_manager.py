@@ -60,15 +60,20 @@ def get_current_commit_sha():
 def sanitize_branch_name(branch):
     """
     Security: Validate and sanitize git branch names to prevent command injection.
-    Only allows alphanumeric characters, hyphens, and underscores in branch segments,
+    Only allows alphanumeric characters, hyphens, underscores, and dots in branch segments,
     with forward slashes as path separators for hierarchical branch names.
+    Branch names must start with alphanumeric characters to prevent flag injection.
     Branch names are limited to 255 characters.
     """
     if not branch or not isinstance(branch, str):
         raise ValueError("Invalid branch name")
     # Only allow safe characters for branch names with reasonable length limit
-    # Pattern allows segments like 'feature/branch-name' or 'main' but not '..' or other traversal attempts
-    if not re.match(r'^[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*$', branch):
+    # Pattern requires alphanumeric start to prevent flag injection (e.g., -rf)
+    # Allows dots for version tags (e.g., release/v1.2.3) but prevents path traversal
+    if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9._-]*(?:/[a-zA-Z0-9][a-zA-Z0-9._-]*)*$', branch):
+        raise ValueError(f"Invalid branch name: {branch}")
+    # Additional safety check: prevent path traversal attempts
+    if '..' in branch or branch.startswith('.') or branch.endswith('.'):
         raise ValueError(f"Invalid branch name: {branch}")
     # Additional safety check: limit total length
     if len(branch) > 255:
