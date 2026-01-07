@@ -98,9 +98,6 @@ def run_update(host, user, name, log_list, repo_only=False):
             log("Supported distributions: Ubuntu, Debian, Fedora, CentOS, Arch")
             error_occurred = True
             error_details.append(f"Unsupported distribution: {distro}")
-            # Send error notification
-            if email_config.get_error_notifications_enabled():
-                email_notifier.send_error_notification(name, f"Unsupported distribution: {distro}")
             return
         
         # Execute the update command

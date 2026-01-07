@@ -35,9 +35,6 @@ def send_email(subject, body, html_body=None):
         if not settings.get(field):
             return False, f"Email configuration incomplete: {field} not set"
     
-    if not settings.get("recipient_emails"):
-        return False, "No recipient emails configured"
-    
     try:
         # Create message
         msg = MIMEMultipart('alternative')
