@@ -1,13 +1,17 @@
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="/static/style.css">
-
-<div class="container">
-  <form method="post" class="card">
-    <h3>Login</h3>
-    <input name="user" placeholder="Username"><br><br>
-    <input name="pass" type="password" placeholder="Password"><br><br>
-    <input type="hidden" name="next" value="{{ next }}">
-    <button class="btn">Login</button>
-  </form>
-</div>
-
+<html>
+<head>
+    <title>Login Page</title>
+</head>
+<body>
+    <form action="/login" method="post">
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username" required>
+        <br>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
+        <br>
+        <button type="submit">Login</button>
+    </form>
+    <button onclick="history.back()">Back</button>
+</body>
+</html>
