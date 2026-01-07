@@ -75,9 +75,27 @@ def init_db():
 
 def run(cmd):
     """Führt einen Shell-Befehl aus und gibt den gesamten Output zurück."""
-    # cmd is a list
+    # Validate that cmd is a list to prevent command injection
+    if not isinstance(cmd, list):
+        raise ValueError("Command must be a list, not a string")
+    
+    # Validate that cmd is not empty
+    if not cmd:
+        raise ValueError("Command list cannot be empty")
+    
+    # Validate that all arguments are strings
+    if not all(isinstance(arg, str) for arg in cmd):
+        raise ValueError("All command arguments must be strings")
+    
+    # Validate command executable (first element) doesn't contain path traversal or shell metacharacters
+    # Allow only alphanumeric, dash, underscore, and forward slash for absolute paths
+    executable = cmd[0]
+    if not re.match(r'^[a-zA-Z0-9/_-]+$', executable):
+        raise ValueError(f"Invalid command executable: {executable}")
+    
     try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        # Explicitly set shell=False to prevent shell injection
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, shell=False)
         return res.stdout
     except Exception as e:
         return str(e)
