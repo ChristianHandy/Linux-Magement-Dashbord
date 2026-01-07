@@ -5,6 +5,7 @@ Handles checking for new dashboard versions from GitHub and managing update noti
 
 import json
 import os
+import re
 import time
 import shutil
 import subprocess
@@ -59,18 +60,19 @@ def get_current_commit_sha():
 def sanitize_branch_name(branch):
     """
     Security: Validate and sanitize git branch names to prevent command injection.
-    Only allows alphanumeric characters, hyphens, underscores, slashes, and dots.
+    Only allows alphanumeric characters, hyphens, and underscores in branch segments,
+    with forward slashes as path separators for hierarchical branch names.
     Branch names are limited to 255 characters.
     """
-    import re
     if not branch or not isinstance(branch, str):
         raise ValueError("Invalid branch name")
     # Only allow safe characters for branch names with reasonable length limit
-    if not re.match(r'^[a-zA-Z0-9/_.-]{1,255}$', branch):
+    # Pattern allows segments like 'feature/branch-name' or 'main' but not '..' or other traversal attempts
+    if not re.match(r'^[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*$', branch):
         raise ValueError(f"Invalid branch name: {branch}")
-    # Additional check: prevent path traversal
-    if '..' in branch:
-        raise ValueError(f"Invalid branch name: {branch}")
+    # Additional safety check: limit total length
+    if len(branch) > 255:
+        raise ValueError(f"Branch name too long: {branch}")
     return branch
 
 def get_current_branch():
@@ -249,12 +251,6 @@ def perform_self_update(preserve_configs=True):
         
         # Get current branch (already sanitized by get_current_branch)
         branch = get_current_branch()
-        
-        # Additional security check: validate branch name before use
-        try:
-            branch = sanitize_branch_name(branch)
-        except ValueError as e:
-            return False, f"Invalid branch name: {e}"
         
         # Pull latest changes
         result = subprocess.run(
