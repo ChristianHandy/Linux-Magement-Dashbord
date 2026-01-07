@@ -31,3 +31,4 @@ Thumbs.db
 # App specific
 *.log
 version_check.json
+email_settings.json

@@ -7,6 +7,8 @@ from addon_loader import AddonManager
 from functools import wraps
 import user_management
 import version_manager
+import email_config
+import email_notifier
 
 # Load environment variables from .env file if python-dotenv is available
 try:
@@ -255,6 +257,64 @@ def update_settings():
     # GET request - display current settings
     settings = scheduler.load_update_settings()
     return render_template("update_settings.html", settings=settings)
+
+# Email settings routes
+@app.route("/email_settings", methods=["GET", "POST"])
+@login_required
+def email_settings():
+    """Manage email notification settings"""
+    # Require operator or admin role to modify settings
+    if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+        flash('You need operator or admin role to modify email settings.')
+        return redirect(url_for('index'))
+    
+    if request.method == "POST":
+        # Check if this is a test email request
+        if request.form.get("test_email"):
+            success, error = email_notifier.test_email_configuration()
+            if success:
+                flash('Test email sent successfully! Check your inbox.')
+            else:
+                flash(f'Failed to send test email: {error}')
+            return redirect(url_for('email_settings'))
+        
+        # Regular settings update
+        settings = email_config.load_email_settings()
+        
+        # Update settings from form
+        settings["email_enabled"] = bool(request.form.get("email_enabled"))
+        settings["smtp_server"] = request.form.get("smtp_server", "").strip()
+        settings["smtp_port"] = int(request.form.get("smtp_port", 587))
+        settings["smtp_use_tls"] = bool(request.form.get("smtp_use_tls"))
+        settings["smtp_username"] = request.form.get("smtp_username", "").strip()
+        settings["smtp_password"] = request.form.get("smtp_password", "").strip()
+        settings["sender_email"] = request.form.get("sender_email", "").strip()
+        
+        # Parse recipient emails (one per line)
+        recipient_text = request.form.get("recipient_emails", "").strip()
+        settings["recipient_emails"] = [email.strip() for email in recipient_text.split('\n') if email.strip()]
+        
+        settings["report_enabled"] = bool(request.form.get("report_enabled"))
+        settings["report_interval"] = request.form.get("report_interval", "weekly")
+        settings["error_notifications_enabled"] = bool(request.form.get("error_notifications_enabled"))
+        
+        # Validate report interval
+        if settings["report_interval"] not in ["daily", "weekly", "monthly"]:
+            settings["report_interval"] = "weekly"
+        
+        # Save settings
+        email_config.save_email_settings(settings)
+        
+        # Reconfigure scheduler to apply report changes
+        scheduler.configure_scheduler()
+        
+        flash('Email settings saved successfully')
+        return redirect(url_for('email_settings'))
+    
+    # GET request - display current settings
+    settings = email_config.load_email_settings()
+    return render_template("email_settings.html", settings=settings)
+
 
 # Dashboard version update routes
 @app.route("/dashboard_version/check")

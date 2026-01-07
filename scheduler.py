@@ -2,6 +2,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from updater import run_update
 import json
 import os
+import email_config
+import email_notifier
 
 scheduler = BackgroundScheduler()
 
@@ -47,9 +49,37 @@ def scheduled_updates():
     settings["last_auto_update"] = time.ctime()
     save_update_settings(settings)
 
+def scheduled_email_report():
+    """Send scheduled email report with system status"""
+    if not email_config.get_report_enabled():
+        return
+    
+    try:
+        # Load hosts
+        with open("hosts.json", "r") as f:
+            hosts = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        hosts = {}
+    
+    # Load history
+    try:
+        with open("history.json", "r") as f:
+            history = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        history = {}
+    
+    # Check host status (simplified - just check if host exists in config)
+    hosts_status = {name: True for name in hosts.keys()}
+    
+    # Send the report
+    success, error = email_notifier.send_update_report(hosts_status, history)
+    if not success:
+        print(f"Failed to send scheduled email report: {error}")
+
 def configure_scheduler():
     """Configure the scheduler based on update settings"""
     settings = load_update_settings()
+    email_settings = email_config.load_email_settings()
     
     # Remove existing jobs
     scheduler.remove_all_jobs()
@@ -63,6 +93,17 @@ def configure_scheduler():
             scheduler.add_job(scheduled_updates, "interval", weeks=1, id="auto_update")
         elif frequency == "monthly":
             scheduler.add_job(scheduled_updates, "interval", days=30, id="auto_update")
+    
+    # Schedule email reports if enabled
+    if email_config.get_report_enabled():
+        report_interval = email_settings.get("report_interval", "weekly")
+        
+        if report_interval == "daily":
+            scheduler.add_job(scheduled_email_report, "interval", days=1, id="email_report")
+        elif report_interval == "weekly":
+            scheduler.add_job(scheduled_email_report, "interval", weeks=1, id="email_report")
+        elif report_interval == "monthly":
+            scheduler.add_job(scheduled_email_report, "interval", days=30, id="email_report")
 
 # Start scheduler
 scheduler.start()

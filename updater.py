@@ -3,6 +3,8 @@ import os
 import logging
 import paramiko
 import time
+import email_config
+import email_notifier
 
 SUPPORTED_DISTRIBUTIONS = ['ubuntu', 'debian', 'fedora', 'centos', 'arch']
 
@@ -25,6 +27,9 @@ def run_update(host, user, name, log_list, repo_only=False):
         log_list.append(log_msg)
     
     ssh = None
+    error_occurred = False
+    error_details = []
+    
     try:
         log(f"Connecting to {name} ({host})...")
         
@@ -88,8 +93,11 @@ def run_update(host, user, name, log_list, repo_only=False):
                 log("Running full system update...")
         
         else:
-            log(f"✗ Unsupported distribution '{distro}'")
+            error_msg = f"✗ Unsupported distribution '{distro}'"
+            log(error_msg)
             log("Supported distributions: Ubuntu, Debian, Fedora, CentOS, Arch")
+            error_occurred = True
+            error_details.append(f"Unsupported distribution: {distro}")
             return
         
         # Execute the update command
@@ -109,22 +117,41 @@ def run_update(host, user, name, log_list, repo_only=False):
         if exit_status == 0:
             log(f"✓ Update completed successfully for {name}")
         else:
-            log(f"✗ Update finished with exit code {exit_status}")
+            error_msg = f"✗ Update finished with exit code {exit_status}"
+            log(error_msg)
+            error_occurred = True
+            error_details.append(f"Update failed with exit code {exit_status}")
+            
             # Read any error messages
             errors = stderr.read().decode().strip()
             if errors:
                 log(f"Errors: {errors}")
+                error_details.append(f"Error output: {errors}")
         
     except paramiko.AuthenticationException:
-        log(f"✗ Authentication failed for {name}. Check SSH keys or credentials.")
+        error_msg = f"✗ Authentication failed for {name}. Check SSH keys or credentials."
+        log(error_msg)
+        error_occurred = True
+        error_details.append("Authentication failed - check SSH keys or credentials")
     except paramiko.SSHException as e:
-        log(f"✗ SSH error connecting to {name}: {str(e)}")
+        error_msg = f"✗ SSH error connecting to {name}: {str(e)}"
+        log(error_msg)
+        error_occurred = True
+        error_details.append(f"SSH error: {str(e)}")
     except Exception as e:
-        log(f"✗ Error updating {name}: {str(e)}")
+        error_msg = f"✗ Error updating {name}: {str(e)}"
+        log(error_msg)
+        error_occurred = True
+        error_details.append(f"Unexpected error: {str(e)}")
     finally:
         if ssh:
             ssh.close()
             log(f"Disconnected from {name}")
+        
+        # Send error notification if an error occurred
+        if error_occurred and email_config.get_error_notifications_enabled():
+            error_message = "\n".join(error_details)
+            email_notifier.send_error_notification(name, error_message)
 
 def get_current_distribution():
     try:
