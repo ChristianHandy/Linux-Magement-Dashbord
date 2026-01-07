@@ -6,9 +6,9 @@ import time
 import subprocess
 import email_config
 import email_notifier
-from constants import is_localhost
+from constants import is_localhost, is_windows, get_platform
 
-SUPPORTED_DISTRIBUTIONS = ['ubuntu', 'debian', 'fedora', 'centos', 'arch']
+SUPPORTED_DISTRIBUTIONS = ['ubuntu', 'debian', 'fedora', 'centos', 'arch', 'windows']
 
 def get_update_command(distro, repo_only=False):
     """
@@ -56,6 +56,16 @@ def get_update_command(distro, repo_only=False):
             cmd = "sudo pacman -Syu --noconfirm"
             desc = "full system update"
     
+    elif distro == 'windows':
+        if repo_only:
+            # Windows Update via PowerShell (system updates only)
+            cmd = 'powershell.exe -Command "Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction SilentlyContinue; Install-Module PSWindowsUpdate -Force -ErrorAction SilentlyContinue; Import-Module PSWindowsUpdate; Get-WindowsUpdate -AcceptAll -Install -AutoReboot:$false"'
+            desc = "Windows system updates only"
+        else:
+            # Full Windows Update + software updates via winget
+            cmd = 'powershell.exe -Command "Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction SilentlyContinue; Install-Module PSWindowsUpdate -Force -ErrorAction SilentlyContinue; Import-Module PSWindowsUpdate; Get-WindowsUpdate -AcceptAll -Install -AutoReboot:$false; if (Get-Command winget -ErrorAction SilentlyContinue) { winget upgrade --all --accept-source-agreements --accept-package-agreements --silent }"'
+            desc = "full Windows system and software updates"
+    
     else:
         raise ValueError(f"Unsupported distribution: {distro}")
     
@@ -77,46 +87,55 @@ def run_local_update(name, log_list, repo_only, log_func):
     try:
         log_func(f"Running local update on {name}...")
         
-        # Detect the distribution
-        log_func("Detecting Linux distribution...")
-        try:
-            if not os.path.exists('/etc/os-release'):
-                raise FileNotFoundError("The /etc/os-release file is missing. This file is required to detect the Linux distribution.")
-            
-            with open('/etc/os-release', 'r') as f:
-                for line in f:
-                    if line.startswith('ID='):
-                        # Use split with maxsplit=1 to handle lines with multiple '=' safely
-                        parts = line.strip().split('=', 1)
-                        if len(parts) == 2:
-                            distro = parts[1].strip('"').lower()
-                            break
-                else:
-                    raise ValueError("Could not find 'ID=' line in /etc/os-release")
-        except FileNotFoundError as e:
-            error_msg = f"✗ {str(e)}"
-            log_func(error_msg)
-            error_occurred = True
-            error_details.append(str(e))
-            if email_config.get_error_notifications_enabled():
-                email_notifier.send_error_notification(name, "\n".join(error_details))
-            return
-        except PermissionError:
-            error_msg = "✗ Permission denied reading /etc/os-release. Ensure the application has read permissions."
-            log_func(error_msg)
-            error_occurred = True
-            error_details.append("Permission denied reading /etc/os-release")
-            if email_config.get_error_notifications_enabled():
-                email_notifier.send_error_notification(name, "\n".join(error_details))
-            return
-        except Exception as e:
-            error_msg = f"✗ Could not detect distribution: {e}"
-            log_func(error_msg)
-            error_occurred = True
-            error_details.append(f"Could not detect distribution: {e}")
-            if email_config.get_error_notifications_enabled():
-                email_notifier.send_error_notification(name, "\n".join(error_details))
-            return
+        # Detect the operating system and distribution
+        current_platform = get_platform()
+        log_func(f"Detecting operating system... Platform: {current_platform}")
+        
+        if current_platform == 'windows':
+            # Windows detection
+            distro = 'windows'
+            log_func("Detected Windows operating system")
+        else:
+            # Linux/Unix distribution detection
+            log_func("Detecting Linux distribution...")
+            try:
+                if not os.path.exists('/etc/os-release'):
+                    raise FileNotFoundError("The /etc/os-release file is missing. This file is required to detect the Linux distribution.")
+                
+                with open('/etc/os-release', 'r') as f:
+                    for line in f:
+                        if line.startswith('ID='):
+                            # Use split with maxsplit=1 to handle lines with multiple '=' safely
+                            parts = line.strip().split('=', 1)
+                            if len(parts) == 2:
+                                distro = parts[1].strip('"').lower()
+                                break
+                    else:
+                        raise ValueError("Could not find 'ID=' line in /etc/os-release")
+            except FileNotFoundError as e:
+                error_msg = f"✗ {str(e)}"
+                log_func(error_msg)
+                error_occurred = True
+                error_details.append(str(e))
+                if email_config.get_error_notifications_enabled():
+                    email_notifier.send_error_notification(name, "\n".join(error_details))
+                return
+            except PermissionError:
+                error_msg = "✗ Permission denied reading /etc/os-release. Ensure the application has read permissions."
+                log_func(error_msg)
+                error_occurred = True
+                error_details.append("Permission denied reading /etc/os-release")
+                if email_config.get_error_notifications_enabled():
+                    email_notifier.send_error_notification(name, "\n".join(error_details))
+                return
+            except Exception as e:
+                error_msg = f"✗ Could not detect distribution: {e}"
+                log_func(error_msg)
+                error_occurred = True
+                error_details.append(f"Could not detect distribution: {e}")
+                if email_config.get_error_notifications_enabled():
+                    email_notifier.send_error_notification(name, "\n".join(error_details))
+                return
         
         log_func(f"Detected distribution: {distro}")
         
@@ -127,7 +146,7 @@ def run_local_update(name, log_list, repo_only, log_func):
         except ValueError as e:
             error_msg = f"✗ {str(e)}"
             log_func(error_msg)
-            log_func("Supported distributions: Ubuntu, Debian, Fedora, CentOS, Arch")
+            log_func("Supported distributions: Ubuntu, Debian, Fedora, CentOS, Arch, Windows")
             error_occurred = True
             error_details.append(str(e))
             if email_config.get_error_notifications_enabled():
@@ -227,11 +246,30 @@ def run_update(host, user, name, log_list, repo_only=False):
         ssh.connect(host, username=user, timeout=30)
         log(f"Connected to {name}")
         
-        # Detect the distribution
-        log("Detecting Linux distribution...")
-        stdin, stdout, stderr = ssh.exec_command("cat /etc/os-release | grep '^ID=' | cut -d'=' -f2 | tr -d '\"'")
-        distro = stdout.read().decode().strip().lower()
-        log(f"Detected distribution: {distro}")
+        # Detect the operating system and distribution
+        log("Detecting operating system...")
+        # First, try to detect if it's Windows by checking for PowerShell
+        stdin, stdout, stderr = ssh.exec_command("powershell.exe -Command \"Write-Output 'windows'\" 2>$null || echo ''")
+        result = stdout.read().decode().strip().lower()
+        
+        if result == 'windows':
+            distro = 'windows'
+            log("Detected Windows operating system")
+        else:
+            # Try Linux detection
+            log("Detecting Linux distribution...")
+            stdin, stdout, stderr = ssh.exec_command("cat /etc/os-release | grep '^ID=' | cut -d'=' -f2 | tr -d '\"'")
+            distro = stdout.read().decode().strip().lower()
+            if distro:
+                log(f"Detected Linux distribution: {distro}")
+            else:
+                error_msg = "✗ Could not detect operating system"
+                log(error_msg)
+                error_occurred = True
+                error_details.append("Could not detect operating system")
+                if email_config.get_error_notifications_enabled():
+                    email_notifier.send_error_notification(name, "\n".join(error_details))
+                return
         
         # Get the update command for this distribution
         try:
@@ -240,7 +278,7 @@ def run_update(host, user, name, log_list, repo_only=False):
         except ValueError as e:
             error_msg = f"✗ {str(e)}"
             log(error_msg)
-            log("Supported distributions: Ubuntu, Debian, Fedora, CentOS, Arch")
+            log("Supported distributions: Ubuntu, Debian, Fedora, CentOS, Arch, Windows")
             error_occurred = True
             error_details.append(str(e))
             return
