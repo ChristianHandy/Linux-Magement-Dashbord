@@ -86,8 +86,11 @@ def run_local_update(name, log_list, repo_only, log_func):
             with open('/etc/os-release', 'r') as f:
                 for line in f:
                     if line.startswith('ID='):
-                        distro = line.strip().split('=')[1].strip('"').lower()
-                        break
+                        # Use split with maxsplit=1 to handle lines with multiple '=' safely
+                        parts = line.strip().split('=', 1)
+                        if len(parts) == 2:
+                            distro = parts[1].strip('"').lower()
+                            break
                 else:
                     raise ValueError("Could not find 'ID=' line in /etc/os-release")
         except FileNotFoundError as e:
