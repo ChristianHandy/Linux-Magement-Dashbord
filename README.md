@@ -39,8 +39,15 @@ A comprehensive web dashboard combining system update management and disk tools 
 - Disk history and operations tracking
 - Remote disk management
 - Automatic disk detection and processing
-- Plugin/addon system for extensibility
+- **Plugin/addon system** for extensibility with remote plugin installation
 - CSV export/import of SMART data
+
+### Plugin System
+- **Plugin Manager** - Web interface to manage plugins
+- **Remote Plugin Repository** - Install plugins directly from the web
+- **Easy Installation** - One-click plugin installation (admin only)
+- **Plugin Uninstallation** - Remove plugins when no longer needed
+- Extensible architecture for custom disk tools and features
 
 ## Installation
 1. Clone repository: `git clone https://github.com/ChristianHandy/linux-update-dashboard.git`
@@ -200,6 +207,99 @@ User information is stored in `users.db` (SQLite database) with the following ta
 - `user_roles` - Many-to-many relationship between users and roles
 
 The database is automatically created on first run and excluded from git (via `.gitignore`).
+
+## Plugin Management
+
+The dashboard includes a powerful plugin system that allows you to extend disk management functionality with custom plugins.
+
+### Accessing the Plugin Manager
+
+1. Navigate to **Disk Management Tools** (`/disks`)
+2. Click the **🔌 Plugin Manager** button
+3. Or directly access `/pluginmanager/`
+
+**Note:** Only administrators can install or uninstall plugins. All users can view installed plugins.
+
+### Plugin Manager Features
+
+**Installed Plugins Section:**
+- View all currently installed plugins
+- See plugin status (OK or Error)
+- View error messages for failed plugins
+- Uninstall plugins (admin only)
+
+**Available Remote Plugins Section:**
+- Browse plugins from the remote repository
+- View plugin details (name, description, version, author)
+- Install plugins with one click (admin only)
+- Automatic detection of already-installed plugins
+
+### Installing a Plugin
+
+1. Navigate to the Plugin Manager (`/pluginmanager/`)
+2. Scroll to the **Available Remote Plugins** section
+3. Find the plugin you want to install
+4. Click the **Install** button
+5. Wait for the installation to complete
+6. **Restart the application** to activate the plugin
+
+**Important:** Application restart is required for plugins to take effect!
+
+### Uninstalling a Plugin
+
+1. Navigate to the Plugin Manager
+2. Find the plugin in the **Installed Plugins** section
+3. Click the **Uninstall** button
+4. Confirm the action
+5. **Restart the application** to complete removal
+
+**Note:** You cannot uninstall the Plugin Manager itself.
+
+### Security
+
+The plugin system includes several security features:
+
+- **Admin-only access** - Only administrators can install or uninstall plugins
+- **Plugin validation** - Plugin IDs are validated (alphanumeric and underscores only)
+- **HTTPS-only downloads** - Remote plugins must be served over HTTPS
+- **Filename validation** - Prevents path traversal attacks
+- **Automatic restart required** - Plugins are not dynamically loaded, preventing runtime injection
+
+### Creating Your Own Plugins
+
+Plugins follow a simple Python structure. See `PLUGIN_REPOSITORY.md` for detailed documentation on:
+- Plugin file structure
+- Remote repository setup
+- Security best practices
+- Testing plugins locally
+
+**Example Plugin Structure:**
+```python
+addon_meta = {
+    "name": "My Plugin",
+    "html": '''
+    {% extends 'disks/base.html' %}
+    {% block title %}My Plugin{% endblock %}
+    {% block content %}
+      <h1>My Plugin Content</h1>
+    {% endblock %}
+    '''
+}
+
+def register(app, core):
+    """Called when the plugin is loaded"""
+    print("[my_plugin] successfully registered.")
+```
+
+### Plugin Repository Configuration
+
+The default remote repository URL can be changed in `addons/plugin_manager.py`:
+```python
+REMOTE_PLUGIN_REPO = "https://your-repo-url/plugins.json"
+```
+
+For information on hosting your own plugin repository, see `PLUGIN_REPOSITORY.md`.
+
 
 ## Managing hosts (via web UI)
 
