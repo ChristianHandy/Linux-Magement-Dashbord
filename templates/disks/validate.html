@@ -1,6 +1,7 @@
 {% extends 'disks/base.html' %}{% block title %}Validate{% endblock %}
 {% block content %}
 <h2>Block Validation for {{ device }}</h2>
+<p><a href="{{ url_for('disks_index') }}" class="btn btn-secondary">← Back to Disk Overview</a></p>
 <div>{% for b in blocks %}
   <span class="block {% if b in bad_blocks %}bad{% else %}good{% endif %}"></span>
   {% if loop.index % 50 == 0 %}<br>{% endif %}

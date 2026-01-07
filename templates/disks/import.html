@@ -1,6 +1,7 @@
 {% extends 'disks/base.html' %}{% block title %}SMART Import{% endblock %}
 {% block content %}
 <h1>Import SMART Report</h1>
+<p><a href="{{ url_for('disks_index') }}" class="btn btn-secondary">← Back to Disk Overview</a></p>
 <form method="post" enctype="multipart/form-data">
   <input class="form-control mb-3" type="file" name="file" accept=".txt,.log">
   <button class="btn btn-primary">Upload</button>
