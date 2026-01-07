@@ -23,6 +23,7 @@ A comprehensive web dashboard combining system update management and disk tools 
 ### System Update Manager
 - Trigger updates remotely on multiple Linux computers via SSH
 - **Automatic update scheduling** with configurable frequency (daily, weekly, monthly)
+- **Email notifications** - Scheduled reports and error alerts via SMTP
 - **Repository-only updates** - Update packages while preserving host configuration files
 - **Full system updates** - Complete updates including configuration files
 - Mobile-friendly UI
@@ -416,6 +417,107 @@ To manually check for updates:
 - The system validates the current branch and commit SHA
 - Updates are fetched from the official GitHub repository only
 
+## Email Reporting
+
+The Linux Management Dashboard includes comprehensive email notification capabilities to keep administrators informed about system status and issues.
+
+### Features
+
+- **Scheduled Reports**: Receive periodic system status reports with host information and update history
+- **Error Notifications**: Get immediate alerts when system updates fail
+- **Flexible Configuration**: Support for any SMTP server (Gmail, Office 365, custom servers)
+- **Multiple Recipients**: Send notifications to multiple email addresses
+- **HTML Formatting**: Professional, easy-to-read email formats with both HTML and plain text
+
+### Accessing Email Settings
+
+1. Log in to the dashboard with operator or admin credentials
+2. Navigate to the main menu (`/index`)
+3. Click the "Email Configuration" button in the System Update Manager section
+4. Configure your SMTP settings and preferences
+
+### Configuration Options
+
+#### SMTP Settings
+- **SMTP Server**: Hostname of your email server (e.g., smtp.gmail.com)
+- **SMTP Port**: Port number (587 for TLS, 465 for SSL, 25 for unencrypted)
+- **Use TLS**: Enable TLS encryption (recommended)
+- **SMTP Username**: Authentication username (usually your email address)
+- **SMTP Password**: Authentication password (for Gmail, use an app-specific password)
+- **Sender Email**: Email address that appears as the sender
+- **Recipient Emails**: One or more email addresses to receive notifications
+
+#### Report Settings
+- **Enable Scheduled Reports**: Toggle periodic system status reports
+- **Report Interval**: Choose how often to send reports (daily, weekly, or monthly)
+- **Enable Error Notifications**: Toggle immediate alerts for update failures
+
+### Email Provider Setup
+
+#### Gmail
+1. Enable 2-factor authentication in your Google Account
+2. Generate an app-specific password:
+   - Go to Google Account → Security → 2-Step Verification → App passwords
+   - Generate a new app password for "Mail"
+3. Use these settings:
+   - SMTP Server: `smtp.gmail.com`
+   - SMTP Port: `587`
+   - Use TLS: ✓ (enabled)
+   - Username: Your Gmail address
+   - Password: The app-specific password (not your regular password)
+
+#### Office 365
+1. Use these settings:
+   - SMTP Server: `smtp.office365.com`
+   - SMTP Port: `587`
+   - Use TLS: ✓ (enabled)
+   - Username: Your full Office 365 email address
+   - Password: Your Office 365 password
+2. Ensure Modern Authentication is enabled if required by your organization
+
+#### Custom SMTP Server
+Configure the appropriate settings for your SMTP server. Contact your email provider or system administrator for specific details.
+
+### Testing Email Configuration
+
+Use the "Send Test Email" button on the email configuration page to verify your settings before enabling automatic reports. This sends a test message to all configured recipients.
+
+### Email Types
+
+#### Scheduled Reports
+Scheduled reports include:
+- Current status of all configured hosts (online/offline)
+- Recent update history
+- Summary of system operations
+- Professional HTML formatting with color-coded status
+
+Reports are sent according to your configured interval (daily, weekly, or monthly).
+
+#### Error Notifications
+Error notifications are sent immediately when:
+- A system update fails
+- SSH connection errors occur
+- Unsupported distributions are detected
+- Any other update-related errors happen
+
+Error notifications include:
+- Host name where the error occurred
+- Timestamp of the error
+- Detailed error message and diagnostics
+- Red alert styling for immediate attention
+
+### Security Notes
+
+- Email settings including passwords are stored in `email_settings.json`
+- The configuration file is excluded from version control via `.gitignore`
+- For production deployments, consider using environment variables for sensitive data
+- Use TLS/SSL encryption when possible to protect credentials in transit
+- App-specific passwords are recommended for Gmail and other providers that support them
+- Only operators and administrators can configure email settings
+
+### Routes
+
+- Email configuration page: `/email_settings`
 
 
 ## Security
