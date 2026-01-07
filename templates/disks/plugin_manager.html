@@ -3,12 +3,16 @@
 {% block content %}
 <div class="container mt-4">
   <h1 class="mb-4">Plugin Manager</h1>
+  
+  <!-- Installed Plugins Section -->
+  <h2 class="mb-3">Installed Plugins</h2>
   <table class="table table-hover table-bordered align-middle">
     <thead class="table-dark">
       <tr>
         <th>Name</th>
         <th>Status</th>
         <th>Error</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -23,10 +27,69 @@
           <span class="text-muted">–</span>
           {% endif %}
         </td>
+        <td>
+          {% if is_admin and p.file != 'plugin_manager.py' %}
+          <form method="post" action="{{ url_for('plugin_manager.uninstall_plugin', plugin_file=p.file) }}" style="display: inline;">
+            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to uninstall this plugin?')">Uninstall</button>
+          </form>
+          {% else %}
+          <span class="text-muted">–</span>
+          {% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
-  <a href="{{ url_for('disks_index') }}" class="btn btn-secondary">Back</a>
+  
+  <!-- Available Remote Plugins Section -->
+  <h2 class="mb-3 mt-5">Available Remote Plugins</h2>
+  {% if is_admin %}
+  <div class="alert alert-info">
+    <strong>💡 Tip:</strong> Install plugins to extend the dashboard functionality. After installation, restart the application to activate the plugins.
+  </div>
+  {% else %}
+  <div class="alert alert-warning">
+    <strong>⚠️ Note:</strong> Only administrators can install or uninstall plugins.
+  </div>
+  {% endif %}
+  
+  {% if remote_plugins %}
+  <div class="row">
+    {% for plugin in remote_plugins %}
+    <div class="col-md-6 mb-3">
+      <div class="card {% if plugin.installed %}border-success{% endif %}">
+        <div class="card-body">
+          <h5 class="card-title">
+            {{ plugin.name }}
+            {% if plugin.installed %}
+            <span class="badge bg-success">Installed</span>
+            {% endif %}
+          </h5>
+          <p class="card-text">{{ plugin.description }}</p>
+          <p class="card-text">
+            <small class="text-muted">Version: {{ plugin.version }}</small><br>
+            <small class="text-muted">Author: {{ plugin.author }}</small>
+          </p>
+          {% if is_admin %}
+          {% if not plugin.installed %}
+          <form method="post" action="{{ url_for('plugin_manager.install_plugin', plugin_id=plugin.id) }}" style="display: inline;">
+            <button type="submit" class="btn btn-primary btn-sm">Install</button>
+          </form>
+          {% else %}
+          <button class="btn btn-secondary btn-sm" disabled>Already Installed</button>
+          {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="alert alert-warning">
+    <strong>⚠️ Note:</strong> Could not fetch remote plugins. Please check your internet connection or try again later.
+  </div>
+  {% endif %}
+  
+  <a href="{{ url_for('disks_index') }}" class="btn btn-secondary mt-3">Back</a>
 </div>
 {% endblock %}

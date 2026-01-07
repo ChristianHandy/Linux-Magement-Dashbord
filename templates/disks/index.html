@@ -15,5 +15,5 @@
   <a class="btn btn-sm btn-danger" href="{{ url_for('format_route', device=d.device) }}">Format</a>
   {{ hook("device_buttons", d.device)|safe }}
 </td></tr>{% endfor %}</tbody></table>
-<div><a href="{{ url_for('disk_history') }}" class="btn btn-secondary">History</a> <a href="{{ url_for('disk_dashboard') }}" class="btn btn-secondary">Dashboard</a> <a href="{{ url_for('export_smart') }}" class="btn btn-secondary">Export SMART</a> <a href="{{ url_for('import_smart') }}" class="btn btn-secondary">Import SMART</a> <a href="{{ url_for('remotes') }}" class="btn btn-info">🌐 Remote Disks</a></div>
+<div><a href="{{ url_for('disk_history') }}" class="btn btn-secondary">History</a> <a href="{{ url_for('disk_dashboard') }}" class="btn btn-secondary">Dashboard</a> <a href="{{ url_for('export_smart') }}" class="btn btn-secondary">Export SMART</a> <a href="{{ url_for('import_smart') }}" class="btn btn-secondary">Import SMART</a> <a href="{{ url_for('remotes') }}" class="btn btn-info">🌐 Remote Disks</a> <a href="{{ url_for('plugin_manager.plugin_manager_index') }}" class="btn btn-success">🔌 Plugin Manager</a></div>
 {% endblock %}
