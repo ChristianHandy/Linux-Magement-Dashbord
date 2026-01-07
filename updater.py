@@ -10,12 +10,26 @@ from constants import is_localhost, is_windows, get_platform
 
 SUPPORTED_DISTRIBUTIONS = ['ubuntu', 'debian', 'fedora', 'centos', 'arch', 'windows']
 
+# Windows Update PowerShell commands
+WINDOWS_UPDATE_BASE = (
+    "Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction SilentlyContinue; "
+    "Install-Module PSWindowsUpdate -Force -ErrorAction SilentlyContinue; "
+    "Import-Module PSWindowsUpdate; "
+    "Get-WindowsUpdate -AcceptAll -Install -AutoReboot:$false"
+)
+
+WINDOWS_WINGET_UPDATE = (
+    "if (Get-Command winget -ErrorAction SilentlyContinue) { "
+    "winget upgrade --all --accept-source-agreements --accept-package-agreements --silent "
+    "}"
+)
+
 def get_update_command(distro, repo_only=False):
     """
-    Get the update command for a given distribution.
+    Get the update command for a given distribution or operating system.
     
     Args:
-        distro: Linux distribution name
+        distro: Operating system name ('ubuntu', 'debian', 'fedora', 'centos', 'arch', 'windows')
         repo_only: If True, only update packages without modifying config files
     
     Returns:
@@ -59,11 +73,11 @@ def get_update_command(distro, repo_only=False):
     elif distro == 'windows':
         if repo_only:
             # Windows Update via PowerShell (system updates only)
-            cmd = 'powershell.exe -Command "Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction SilentlyContinue; Install-Module PSWindowsUpdate -Force -ErrorAction SilentlyContinue; Import-Module PSWindowsUpdate; Get-WindowsUpdate -AcceptAll -Install -AutoReboot:$false"'
+            cmd = f'powershell.exe -Command "{WINDOWS_UPDATE_BASE}"'
             desc = "Windows system updates only"
         else:
             # Full Windows Update + software updates via winget
-            cmd = 'powershell.exe -Command "Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction SilentlyContinue; Install-Module PSWindowsUpdate -Force -ErrorAction SilentlyContinue; Import-Module PSWindowsUpdate; Get-WindowsUpdate -AcceptAll -Install -AutoReboot:$false; if (Get-Command winget -ErrorAction SilentlyContinue) { winget upgrade --all --accept-source-agreements --accept-package-agreements --silent }"'
+            cmd = f'powershell.exe -Command "{WINDOWS_UPDATE_BASE}; {WINDOWS_WINGET_UPDATE}"'
             desc = "full Windows system and software updates"
     
     else:
@@ -249,7 +263,7 @@ def run_update(host, user, name, log_list, repo_only=False):
         # Detect the operating system and distribution
         log("Detecting operating system...")
         # First, try to detect if it's Windows by checking for PowerShell
-        stdin, stdout, stderr = ssh.exec_command("powershell.exe -Command \"Write-Output 'windows'\" 2>$null || echo ''")
+        stdin, stdout, stderr = ssh.exec_command("powershell.exe -Command \"Write-Output 'windows'\" 2>&1 || echo ''")
         result = stdout.read().decode().strip().lower()
         
         if result == 'windows':
