@@ -84,8 +84,12 @@ def sanitize_branch_name(branch):
         raise ValueError("Branch name contains invalid characters or format")
     
     # Additional safety check: prevent path traversal attempts
-    # Check for .., leading/trailing dots, and ./ patterns
-    if '..' in branch or branch.startswith('.') or branch.endswith('.') or './' in branch:
+    # Check for .., consecutive dots, leading/trailing dots, and path traversal patterns
+    if '..' in branch or branch.startswith('.') or branch.endswith('.'):
+        raise ValueError("Branch name contains invalid path traversal patterns")
+    
+    # Check for path traversal patterns like /./ or ^./
+    if re.search(r'(/\./)|(^\./)|(^\./)', branch):
         raise ValueError("Branch name contains invalid path traversal patterns")
     
     # Additional safety check: limit total length
