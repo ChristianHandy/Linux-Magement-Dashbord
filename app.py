@@ -87,9 +87,21 @@ def is_online(host, user):
     
     try:
         ssh = paramiko.SSHClient()
-        # Security Note: AutoAddPolicy accepts any host key, making this vulnerable to MITM attacks.
-        # For production, use WarningPolicy or maintain a known_hosts file.
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        # Load known hosts for secure host key verification
+        try:
+            ssh.load_system_host_keys()
+        except:
+            pass  # Continue if system keys can't be loaded
+        
+        user_known_hosts = os.path.expanduser('~/.ssh/known_hosts')
+        if os.path.exists(user_known_hosts):
+            try:
+                ssh.load_host_keys(user_known_hosts)
+            except:
+                pass  # Continue if user keys can't be loaded
+        
+        # Use RejectPolicy to prevent MITM attacks
+        ssh.set_missing_host_key_policy(paramiko.RejectPolicy())
         ssh.connect(host, username=user, timeout=3)
         ssh.close()
         return True
@@ -489,9 +501,21 @@ def install_key(name):
         target = hosts[name]
         try:
             ssh = paramiko.SSHClient()
-            # Security Note: AutoAddPolicy accepts any host key, making this vulnerable to MITM attacks.
-            # For production, use WarningPolicy or maintain a known_hosts file.
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            # Load known hosts for secure host key verification
+            try:
+                ssh.load_system_host_keys()
+            except:
+                pass  # Continue if system keys can't be loaded
+            
+            user_known_hosts = os.path.expanduser('~/.ssh/known_hosts')
+            if os.path.exists(user_known_hosts):
+                try:
+                    ssh.load_host_keys(user_known_hosts)
+                except:
+                    pass  # Continue if user keys can't be loaded
+            
+            # Use RejectPolicy to prevent MITM attacks
+            ssh.set_missing_host_key_policy(paramiko.RejectPolicy())
             ssh.connect(target["host"], username=target["user"], password=password, timeout=10)
             
             # Security: Use SFTP to safely write the key file instead of shell commands

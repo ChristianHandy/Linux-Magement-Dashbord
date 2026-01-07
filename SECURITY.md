@@ -72,7 +72,7 @@ export FLASK_DEBUG=false
 
 ### Known Limitations
 
-1. **SSH Host Key Validation**: The application uses `AutoAddPolicy` which accepts any SSH host key. This is vulnerable to man-in-the-middle attacks. For production use, implement proper host key verification.
+1. **SSH Host Key Validation**: ~~The application uses `AutoAddPolicy` which accepts any SSH host key. This is vulnerable to man-in-the-middle attacks.~~ **FIXED** - The application now uses `RejectPolicy` with proper known_hosts validation. Add remote hosts to known_hosts before connection: `ssh-keyscan -H hostname >> ~/.ssh/known_hosts`
 
 2. **CSRF Protection**: The application does not currently implement CSRF tokens. Consider adding Flask-WTF for CSRF protection in production.
 
@@ -90,6 +90,7 @@ export FLASK_DEBUG=false
 - ✅ SQL parameterized queries (SQL injection prevention)
 - ✅ Template injection protection
 - ✅ SFTP for secure file operations
+- ✅ SSH host key verification (prevents MITM attacks)
 
 ## Security Checklist for Production
 

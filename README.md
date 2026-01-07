@@ -758,10 +758,10 @@ This project has been hardened with the following security improvements:
    - Session cookies can be intercepted
    - SSH passwords sent to the server are exposed
 
-3. **SSH Host Key Verification** - The current implementation uses `AutoAddPolicy`, which accepts any host key. This is vulnerable to man-in-the-middle attacks. For production:
-   - Manually verify host keys on first connection
-   - Use `WarningPolicy` instead of `AutoAddPolicy`
-   - Maintain a proper `known_hosts` file
+3. **SSH Host Key Verification** - The application now uses `RejectPolicy` with proper known_hosts validation to prevent man-in-the-middle attacks. For setup:
+   - Add remote hosts to known_hosts before first connection: `ssh-keyscan -H hostname >> ~/.ssh/known_hosts`
+   - The application loads host keys from standard locations (~/.ssh/known_hosts and /etc/ssh/ssh_known_hosts)
+   - Unknown hosts will be rejected with a clear error message
 
 4. **Network Security:**
    - Run behind a reverse proxy (nginx, Apache) with TLS
