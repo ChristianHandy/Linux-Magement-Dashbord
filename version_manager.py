@@ -66,18 +66,18 @@ def sanitize_branch_name(branch):
     Branch names are limited to 255 characters.
     """
     if not branch or not isinstance(branch, str):
-        raise ValueError("Invalid branch name")
+        raise ValueError("Branch name cannot be empty or non-string")
     # Only allow safe characters for branch names with reasonable length limit
     # Pattern requires alphanumeric start to prevent flag injection (e.g., -rf)
     # Allows dots for version tags (e.g., release/v1.2.3) but prevents path traversal
     if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9._-]*(?:/[a-zA-Z0-9][a-zA-Z0-9._-]*)*$', branch):
-        raise ValueError(f"Invalid branch name: {branch}")
+        raise ValueError("Branch name contains invalid characters or format")
     # Additional safety check: prevent path traversal attempts
     if '..' in branch or branch.startswith('.') or branch.endswith('.'):
-        raise ValueError(f"Invalid branch name: {branch}")
+        raise ValueError("Branch name contains invalid path traversal patterns")
     # Additional safety check: limit total length
     if len(branch) > 255:
-        raise ValueError(f"Branch name too long: {branch}")
+        raise ValueError("Branch name exceeds maximum length of 255 characters")
     return branch
 
 def get_current_branch():
