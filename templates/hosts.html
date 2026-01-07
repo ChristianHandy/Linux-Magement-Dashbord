@@ -17,12 +17,20 @@
   {% if hosts %}
     {% for name, h in hosts.items() %}
       <div class="card">
-        <b>{{ name }}</b><br>
+        <b>{{ name }}</b>
+        {% if h.host.lower() in localhost_identifiers %}
+          <span class="badge-local">LOCAL</span>
+        {% endif %}
+        <br>
         Host: {{ h.host }}<br>
         User: {{ h.user }}<br><br>
         {% if not current_user_id or 'operator' in current_user_roles or 'admin' in current_user_roles %}
           <a class="btn" href="/hosts/edit/{{ name }}">Edit</a>
-          <a class="btn" href="/hosts/install_key/{{ name }}">Install SSH key</a>
+          {% if h.host.lower() not in localhost_identifiers %}
+            <a class="btn" href="/hosts/install_key/{{ name }}">Install SSH key</a>
+          {% else %}
+            <span class="text-muted">(No SSH key needed for localhost)</span>
+          {% endif %}
           <form action="/hosts/delete/{{ name }}" method="post" style="display:inline">
             <button class="btn" type="submit" onclick="return confirm('Are you sure?')">Delete</button>
           </form>
@@ -35,13 +43,18 @@
 
   {% if not current_user_id or 'operator' in current_user_roles or 'admin' in current_user_roles %}
   <h3>Add / Update Host</h3>
+  <div class="card info-box">
+    <p><strong><span aria-label="Tip">💡</span> Tip:</strong> You can manage this local server by using <code>localhost</code> as the host. 
+    No SSH key is needed for localhost - updates will run directly on this machine.</p>
+    <p><strong>Example:</strong> Display name: "Local Server", Host: "localhost", User: (any value, will be ignored)</p>
+  </div>
   <form method="post" class="card">
     <label>Display name</label><br>
     <input name="name" placeholder="Friendly name"><br><br>
     <label>Host (IP or hostname)</label><br>
-    <input name="host" placeholder="192.168.1.100"><br><br>
+    <input name="host" placeholder="192.168.1.100 or localhost"><br><br>
     <label>User</label><br>
-    <input name="user" placeholder="username"><br><br>
+    <input name="user" placeholder="username (ignored for localhost)"><br><br>
     <button class="btn" type="submit">Save</button>
   </form>
   {% else %}

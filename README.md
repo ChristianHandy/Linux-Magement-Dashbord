@@ -326,7 +326,29 @@ Routes
 
 **Note:** Host management operations (add, edit, delete) require operator or admin role.
 
-Add a host (via web)
+### Managing the Local Server
+
+The dashboard can now manage the local server it's running on, without requiring SSH configuration:
+
+**Add localhost as a managed host:**
+1. Log in to the dashboard (`/`) with the configured username/password.
+2. Open `/hosts` (or click "Manage Hosts" on the dashboard).
+3. Fill in:
+   - Display name: A friendly name like "Local Server"
+   - Host: `localhost` (or `127.0.0.1`)
+   - User: Any value (ignored for localhost)
+4. Click Save. The local server will appear in the list marked with a "LOCAL" badge.
+
+**Benefits of using localhost:**
+- No SSH key setup required
+- Updates run directly on the local system using subprocess
+- Works immediately without additional configuration
+- Perfect for managing the dashboard server itself
+
+**Security Note:** Running updates on localhost still requires sudo privileges. Ensure the dashboard is run with appropriate permissions (see "Running & testing" section below).
+
+### Add a remote host (via web)
+
 1. Log in to the dashboard (`/`) with the configured username/password.
 2. Open `/hosts` (or click "Manage Hosts" on the dashboard).
 3. Fill in:
@@ -343,6 +365,7 @@ Delete a host
 
 Install SSH public key on a remote host
 - Click "Install SSH key" next to the host on `/hosts`.
+- **Note:** SSH key installation is not needed for localhost hosts.
 - Enter the remote account password once and submit.
   - The server will:
     - Use your dashboard host's public key (`~/.ssh/id_rsa.pub`) if present, or
@@ -355,7 +378,8 @@ hosts.json format
 ```json
 {
   "my-pc": { "host": "192.168.1.50", "user": "user" },
-  "server-1": { "host": "server.example.local", "user": "admin" }
+  "server-1": { "host": "server.example.local", "user": "admin" },
+  "local-server": { "host": "localhost", "user": "ignored" }
 }
 ```
 - You can edit `hosts.json` by hand, but the web UI will overwrite the file when hosts are added/edited/deleted. Back it up before manual edits.

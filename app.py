@@ -9,6 +9,7 @@ import user_management
 import version_manager
 import email_config
 import email_notifier
+from constants import is_localhost, LOCALHOST_IDENTIFIERS
 
 # Load environment variables from .env file if python-dotenv is available
 try:
@@ -54,7 +55,8 @@ def inject_user_context():
     return dict(
         current_user_id=user_id,
         current_user_roles=user_roles,
-        is_admin=is_admin
+        is_admin=is_admin,
+        localhost_identifiers=LOCALHOST_IDENTIFIERS
     )
 
 # Template function for version update notifications
@@ -78,6 +80,11 @@ def current_user_has_role(*roles):
     return any(role in user_roles for role in roles)
 
 def is_online(host, user):
+    # Check if this is localhost
+    if is_localhost(host):
+        # For localhost, just return True (we're always online to ourselves)
+        return True
+    
     try:
         ssh = paramiko.SSHClient()
         # Security Note: AutoAddPolicy accepts any host key, making this vulnerable to MITM attacks.
@@ -461,6 +468,14 @@ def install_key(name):
     hosts = load_hosts()
     if name not in hosts:
         return redirect("/hosts")
+    
+    target = hosts[name]
+    
+    # Check if this is localhost - no SSH key needed
+    if is_localhost(target["host"]):
+        flash('SSH key installation is not needed for localhost. Updates will run directly on the local system.')
+        return redirect("/hosts")
+    
     error = None
     success = False
     if request.method == "POST":

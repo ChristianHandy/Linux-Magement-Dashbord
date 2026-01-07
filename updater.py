@@ -3,18 +3,195 @@ import os
 import logging
 import paramiko
 import time
+import subprocess
 import email_config
 import email_notifier
+from constants import is_localhost
 
 SUPPORTED_DISTRIBUTIONS = ['ubuntu', 'debian', 'fedora', 'centos', 'arch']
 
-def run_update(host, user, name, log_list, repo_only=False):
+def get_update_command(distro, repo_only=False):
     """
-    Run system update on a remote host via SSH.
+    Get the update command for a given distribution.
     
     Args:
-        host: Hostname or IP address of the remote system
-        user: SSH username
+        distro: Linux distribution name
+        repo_only: If True, only update packages without modifying config files
+    
+    Returns:
+        tuple: (command_string, description)
+    
+    Raises:
+        ValueError: If distribution is not supported
+    """
+    if distro in ['ubuntu', 'debian']:
+        if repo_only:
+            cmd = "sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::='--force-confold'"
+            desc = "repository-only update (preserving config files)"
+        else:
+            cmd = "sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && sudo DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y"
+            desc = "full system update"
+    
+    elif distro == 'fedora':
+        if repo_only:
+            cmd = "sudo dnf upgrade -y --setopt=tsflags=noscripts"
+            desc = "repository-only update (preserving config files)"
+        else:
+            cmd = "sudo dnf upgrade -y"
+            desc = "full system update"
+    
+    elif distro == 'centos':
+        if repo_only:
+            cmd = "sudo yum update -y --setopt=tsflags=noscripts"
+            desc = "repository-only update (preserving config files)"
+        else:
+            cmd = "sudo yum update -y"
+            desc = "full system update"
+    
+    elif distro == 'arch':
+        if repo_only:
+            cmd = "sudo pacman -Syu --noconfirm --needed"
+            desc = "repository-only update"
+        else:
+            cmd = "sudo pacman -Syu --noconfirm"
+            desc = "full system update"
+    
+    else:
+        raise ValueError(f"Unsupported distribution: {distro}")
+    
+    return cmd, desc
+
+def run_local_update(name, log_list, repo_only, log_func):
+    """
+    Run system update locally using subprocess.
+    
+    Args:
+        name: Display name for the host (used in logs)
+        log_list: List to append log messages to
+        repo_only: If True, only update packages from repositories without modifying config files
+        log_func: Logging function to use
+    """
+    error_occurred = False
+    error_details = []
+    
+    try:
+        log_func(f"Running local update on {name}...")
+        
+        # Detect the distribution
+        log_func("Detecting Linux distribution...")
+        try:
+            if not os.path.exists('/etc/os-release'):
+                raise FileNotFoundError("The /etc/os-release file is missing. This file is required to detect the Linux distribution.")
+            
+            with open('/etc/os-release', 'r') as f:
+                for line in f:
+                    if line.startswith('ID='):
+                        # Use split with maxsplit=1 to handle lines with multiple '=' safely
+                        parts = line.strip().split('=', 1)
+                        if len(parts) == 2:
+                            distro = parts[1].strip('"').lower()
+                            break
+                else:
+                    raise ValueError("Could not find 'ID=' line in /etc/os-release")
+        except FileNotFoundError as e:
+            error_msg = f"✗ {str(e)}"
+            log_func(error_msg)
+            error_occurred = True
+            error_details.append(str(e))
+            if email_config.get_error_notifications_enabled():
+                email_notifier.send_error_notification(name, "\n".join(error_details))
+            return
+        except PermissionError:
+            error_msg = "✗ Permission denied reading /etc/os-release. Ensure the application has read permissions."
+            log_func(error_msg)
+            error_occurred = True
+            error_details.append("Permission denied reading /etc/os-release")
+            if email_config.get_error_notifications_enabled():
+                email_notifier.send_error_notification(name, "\n".join(error_details))
+            return
+        except Exception as e:
+            error_msg = f"✗ Could not detect distribution: {e}"
+            log_func(error_msg)
+            error_occurred = True
+            error_details.append(f"Could not detect distribution: {e}")
+            if email_config.get_error_notifications_enabled():
+                email_notifier.send_error_notification(name, "\n".join(error_details))
+            return
+        
+        log_func(f"Detected distribution: {distro}")
+        
+        # Get the update command for this distribution
+        try:
+            update_cmd, description = get_update_command(distro, repo_only)
+            log_func(f"Running {description}...")
+        except ValueError as e:
+            error_msg = f"✗ {str(e)}"
+            log_func(error_msg)
+            log_func("Supported distributions: Ubuntu, Debian, Fedora, CentOS, Arch")
+            error_occurred = True
+            error_details.append(str(e))
+            if email_config.get_error_notifications_enabled():
+                email_notifier.send_error_notification(name, "\n".join(error_details))
+            return
+        
+        # Execute the update command locally
+        log_func("Executing update command...")
+        
+        # Security Note: Using shell=True is required here because update_cmd contains 
+        # shell operators (&&) and environment variables that need shell interpretation.
+        # The command string is constructed entirely from:
+        # 1. Trusted internal distribution detection (validated against known distros)
+        # 2. Hardcoded command templates defined in get_update_command()
+        # 3. No user input is incorporated into the command
+        # This approach is acceptable because:
+        # - The distribution is detected from the system's /etc/os-release file
+        # - Commands are selected from a fixed set of templates per distribution
+        # - No external or user-provided data influences command construction
+        # Alternative: Could use subprocess.run() with shell=False and pass commands
+        # as arrays, but would require restructuring the command chains.
+        process = subprocess.Popen(
+            update_cmd,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        
+        # Read output in real-time
+        for line in process.stdout:
+            log_func(line.rstrip())
+        
+        # Wait for process to complete
+        exit_status = process.wait()
+        
+        if exit_status == 0:
+            log_func(f"✓ Update completed successfully for {name}")
+        else:
+            error_msg = f"✗ Update finished with exit code {exit_status}"
+            log_func(error_msg)
+            error_occurred = True
+            error_details.append(f"Update failed with exit code {exit_status}")
+        
+    except Exception as e:
+        error_msg = f"✗ Error updating {name}: {str(e)}"
+        log_func(error_msg)
+        error_occurred = True
+        error_details.append(f"Unexpected error: {str(e)}")
+    
+    finally:
+        # Send error notification if an error occurred
+        if error_occurred and email_config.get_error_notifications_enabled():
+            error_message = "\n".join(error_details)
+            email_notifier.send_error_notification(name, error_message)
+
+def run_update(host, user, name, log_list, repo_only=False):
+    """
+    Run system update on a remote host via SSH or locally via subprocess.
+    
+    Args:
+        host: Hostname or IP address of the remote system (or 'localhost')
+        user: SSH username (ignored for localhost)
         name: Display name for the host (used in logs)
         log_list: List to append log messages to
         repo_only: If True, only update packages from repositories without modifying config files
@@ -26,6 +203,11 @@ def run_update(host, user, name, log_list, repo_only=False):
         print(log_msg)
         log_list.append(log_msg)
     
+    # Check if this is a local update
+    if is_localhost(host):
+        return run_local_update(name, log_list, repo_only, log)
+    
+    # Remote update via SSH
     ssh = None
     error_occurred = False
     error_details = []
@@ -51,53 +233,16 @@ def run_update(host, user, name, log_list, repo_only=False):
         distro = stdout.read().decode().strip().lower()
         log(f"Detected distribution: {distro}")
         
-        # Determine the update commands based on distribution and update type
-        if distro in ['ubuntu', 'debian']:
-            if repo_only:
-                # Repository-only update for Debian/Ubuntu (preserve config files)
-                update_cmd = "sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::='--force-confold'"
-                log("Running repository-only update (preserving config files)...")
-            else:
-                # Full system update for Debian/Ubuntu
-                update_cmd = "sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && sudo DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y"
-                log("Running full system update...")
-        
-        elif distro == 'fedora':
-            if repo_only:
-                # Repository-only update for Fedora (preserve config files)
-                update_cmd = "sudo dnf upgrade -y --setopt=tsflags=noscripts"
-                log("Running repository-only update (preserving config files)...")
-            else:
-                # Full system update for Fedora
-                update_cmd = "sudo dnf upgrade -y"
-                log("Running full system update...")
-        
-        elif distro == 'centos':
-            if repo_only:
-                # Repository-only update for CentOS (preserve config files)
-                update_cmd = "sudo yum update -y --setopt=tsflags=noscripts"
-                log("Running repository-only update (preserving config files)...")
-            else:
-                # Full system update for CentOS
-                update_cmd = "sudo yum update -y"
-                log("Running full system update...")
-        
-        elif distro == 'arch':
-            if repo_only:
-                # Repository-only update for Arch (skip already installed packages)
-                update_cmd = "sudo pacman -Syu --noconfirm --needed"
-                log("Running repository-only update...")
-            else:
-                # Full system update for Arch
-                update_cmd = "sudo pacman -Syu --noconfirm"
-                log("Running full system update...")
-        
-        else:
-            error_msg = f"✗ Unsupported distribution '{distro}'"
+        # Get the update command for this distribution
+        try:
+            update_cmd, description = get_update_command(distro, repo_only)
+            log(f"Running {description}...")
+        except ValueError as e:
+            error_msg = f"✗ {str(e)}"
             log(error_msg)
             log("Supported distributions: Ubuntu, Debian, Fedora, CentOS, Arch")
             error_occurred = True
-            error_details.append(f"Unsupported distribution: {distro}")
+            error_details.append(str(e))
             return
         
         # Execute the update command
