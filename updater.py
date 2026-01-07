@@ -251,12 +251,27 @@ def run_update(host, user, name, log_list, repo_only=False):
     try:
         log(f"Connecting to {name} ({host})...")
         
-        # Create SSH client
-        # Note: Using AutoAddPolicy for convenience, but this is a security risk
-        # as it automatically accepts unknown host keys (vulnerable to MITM attacks).
-        # For production use, implement proper host key verification.
+        # Create SSH client with proper host key verification
         ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        # Load system host keys from standard locations
+        # This loads known_hosts from ~/.ssh/known_hosts and /etc/ssh/ssh_known_hosts
+        try:
+            ssh.load_system_host_keys()
+        except Exception as e:
+            log(f"Warning: Could not load system host keys: {e}")
+        
+        # Load user-specific known_hosts if it exists
+        user_known_hosts = os.path.expanduser('~/.ssh/known_hosts')
+        if os.path.exists(user_known_hosts):
+            try:
+                ssh.load_host_keys(user_known_hosts)
+            except Exception as e:
+                log(f"Warning: Could not load user host keys from {user_known_hosts}: {e}")
+        
+        # Use RejectPolicy to reject unknown hosts (prevents MITM attacks)
+        # Hosts must be added to known_hosts before connection
+        ssh.set_missing_host_key_policy(paramiko.RejectPolicy())
         
         # Connect to the remote host using SSH key authentication
         # The SSH key should be configured beforehand (see "Install SSH key" feature)
@@ -334,10 +349,19 @@ def run_update(host, user, name, log_list, repo_only=False):
         error_occurred = True
         error_details.append("Authentication failed - check SSH keys or credentials")
     except paramiko.SSHException as e:
-        error_msg = f"✗ SSH error connecting to {name}: {str(e)}"
-        log(error_msg)
-        error_occurred = True
-        error_details.append(f"SSH error: {str(e)}")
+        error_msg_str = str(e)
+        # Check if this is a host key rejection error
+        if "not found in known_hosts" in error_msg_str.lower() or "reject" in error_msg_str.lower():
+            error_msg = f"✗ Host key verification failed for {name}. The host key for {host} is not in known_hosts."
+            log(error_msg)
+            log(f"To add this host, run: ssh-keyscan -H {host} >> ~/.ssh/known_hosts")
+            error_occurred = True
+            error_details.append(f"Host key not found in known_hosts. Add it with: ssh-keyscan -H {host} >> ~/.ssh/known_hosts")
+        else:
+            error_msg = f"✗ SSH error connecting to {name}: {error_msg_str}"
+            log(error_msg)
+            error_occurred = True
+            error_details.append(f"SSH error: {error_msg_str}")
     except Exception as e:
         error_msg = f"✗ Error updating {name}: {str(e)}"
         log(error_msg)
