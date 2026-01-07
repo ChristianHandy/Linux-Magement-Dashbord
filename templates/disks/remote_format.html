@@ -7,13 +7,13 @@
   
   <div class="alert alert-danger">
     <h5><i class="bi bi-exclamation-triangle-fill"></i> WARNING</h5>
-    <p><strong>This will PERMANENTLY ERASE ALL DATA on device {{ device }}!</strong></p>
+    <p><strong>This will PERMANENTLY ERASE ALL DATA on device {{ device|e }}!</strong></p>
     <p>This action cannot be undone. Make sure you have selected the correct device and have backed up any important data.</p>
   </div>
   
   <div class="card">
     <div class="card-header bg-warning">
-      <h5>Format Device: <code>{{ device }}</code></h5>
+      <h5>Format Device: <code>{{ device|e }}</code></h5>
     </div>
     <div class="card-body">
       <form method="post">
@@ -37,7 +37,7 @@
         <div class="mb-3 form-check">
           <input type="checkbox" class="form-check-input" id="confirm" required>
           <label class="form-check-label" for="confirm">
-            <strong>I understand that all data on {{ device }} will be permanently erased</strong>
+            <strong>I understand that all data on {{ device|e }} will be permanently erased</strong>
           </label>
         </div>
         

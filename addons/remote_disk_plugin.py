@@ -11,6 +11,7 @@
 import paramiko
 import json
 import re
+import disktool_core
 from flask import request, flash, redirect, url_for
 
 addon_meta = {
@@ -118,9 +119,6 @@ def get_remote_smart(host, port, username, device):
     Get SMART data from a remote disk.
     Returns the smartctl output or None if failed.
     """
-    # Import disktool_core for device name sanitization
-    import disktool_core
-    
     try:
         device = disktool_core.sanitize_device_name(device)
     except ValueError as e:
@@ -140,9 +138,6 @@ def format_remote_disk(host, port, username, device, fs_type):
     Format a remote disk with the specified filesystem.
     Returns success status and message.
     """
-    # Import disktool_core for device name sanitization
-    import disktool_core
-    
     try:
         device = disktool_core.sanitize_device_name(device)
     except ValueError as e:
@@ -176,9 +171,6 @@ def start_remote_smart_test(host, port, username, device, mode):
     Start a SMART test on a remote disk.
     Returns success status and message.
     """
-    # Import disktool_core for device name sanitization
-    import disktool_core
-    
     try:
         device = disktool_core.sanitize_device_name(device)
     except ValueError as e:
