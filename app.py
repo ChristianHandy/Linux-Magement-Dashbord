@@ -191,6 +191,8 @@ def index():
 @login_required
 def dashboard():
     """Linux Update Dashboard"""
+    from updater import detect_os_remote
+    
     hosts = load_hosts()
     history = json.load(open("history.json"))
     status = {n: is_online(h["host"], h["user"]) for n, h in hosts.items()}
@@ -207,7 +209,6 @@ def dashboard():
                 }
             else:
                 # Detect OS and cache it
-                from updater import detect_os_remote
                 os_name, os_version = detect_os_remote(h["host"], h["user"])
                 if os_name:
                     os_info[name] = {
@@ -566,6 +567,8 @@ def install_key(name):
 @login_required
 def detect_host_os(name):
     """Detect or refresh OS information for a host"""
+    from updater import detect_os_remote
+    
     # Require operator or admin role to detect OS
     if session.get("user_id") and not current_user_has_role('operator', 'admin'):
         flash('You need operator or admin role to detect OS.')
@@ -577,9 +580,6 @@ def detect_host_os(name):
         return redirect(url_for('manage_hosts'))
     
     host_info = hosts[name]
-    
-    # Import detection function
-    from updater import detect_os_remote
     
     # Detect OS
     os_name, os_version = detect_os_remote(host_info["host"], host_info["user"])

@@ -75,7 +75,14 @@ def detect_os_remote(host, user):
         
         return (None, None)
         
+    except paramiko.AuthenticationException as e:
+        logging.debug(f"Authentication failed for {host}: {e}")
+        return (None, None)
+    except paramiko.SSHException as e:
+        logging.debug(f"SSH error connecting to {host}: {e}")
+        return (None, None)
     except Exception as e:
+        logging.debug(f"Error detecting OS on {host}: {e}")
         return (None, None)
     finally:
         if ssh:
@@ -93,9 +100,10 @@ def detect_os_local():
         current_platform = get_platform()
         
         if current_platform == 'windows':
-            # Windows detection
-            import platform
-            version = platform.version().split('.')[0] if platform.version() else 'unknown'
+            # Windows detection - use release() for more reliable version info
+            import platform as plat
+            # platform.release() returns '10', '11', etc.
+            version = plat.release() if plat.release() else 'unknown'
             return ('windows', version)
         else:
             # Linux/Unix detection
@@ -112,7 +120,14 @@ def detect_os_local():
                         os_version = line.split('=', 1)[1].strip().strip('"')
                 
                 return (os_name, os_version) if os_name else (None, None)
-    except Exception:
+    except FileNotFoundError:
+        logging.debug("OS detection failed: /etc/os-release not found")
+        return (None, None)
+    except PermissionError:
+        logging.debug("OS detection failed: Permission denied reading /etc/os-release")
+        return (None, None)
+    except Exception as e:
+        logging.debug(f"Error detecting local OS: {e}")
         return (None, None)
 
 def get_update_command(distro, repo_only=False):
