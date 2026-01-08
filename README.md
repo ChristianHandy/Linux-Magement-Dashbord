@@ -25,6 +25,7 @@ A comprehensive web dashboard combining system update management and disk tools 
 - **Cross-platform support** - Linux (Ubuntu, Debian, Fedora, CentOS, Arch) and Windows
 - **Windows Update support** - Automatic Windows system updates via PowerShell
 - **Windows software updates** - Software package updates via winget
+- **IP Change Detection** - Automatic detection and updating of host IP addresses using ARP and MAC addresses (perfect for DHCP environments)
 - **Automatic update scheduling** with configurable frequency (daily, weekly, monthly)
 - **Email notifications** - Scheduled reports and error alerts via SMTP
 - **Repository-only updates** - Update packages while preserving host configuration files
@@ -349,10 +350,47 @@ Routes
 - Edit host: `/hosts/edit/<name>`
 - Delete host (POST): `/hosts/delete/<name>`
 - Install SSH public key (password auth): `/hosts/install_key/<name>`
+- Detect MAC address: `/hosts/detect_mac/<name>`
+- Scan for IP changes: `/hosts/scan_ip_changes`
+- View ARP table: `/hosts/arp_table`
 - Update a host (starts update thread): `/update/<name>`
 - Update progress: `/progress/<name>`
 
 **Note:** Host management operations (add, edit, delete) require operator or admin role.
+
+### IP Change Detection (DHCP Support)
+
+The dashboard now includes automatic IP address change detection for hosts in DHCP environments. This feature uses ARP tables and MAC addresses to track devices even when their IP addresses change.
+
+**Key Features:**
+- **MAC Address Storage**: Store MAC addresses for each host
+- **Automatic MAC Detection**: Click "Detect MAC" to automatically discover a host's MAC address
+- **IP Change Scanning**: Scan the ARP table to detect when host IPs have changed
+- **Automatic Updates**: Host configurations are automatically updated when IP changes are detected
+- **ARP Table Viewer**: View the current system ARP table for troubleshooting
+
+**Quick Start:**
+1. Add a host with its current IP address
+2. Click the "🔍 Detect MAC" button to automatically discover its MAC address
+3. Periodically click "🔍 Scan for IP Changes" to check for and update changed IPs
+4. Changes are automatically applied and displayed in flash messages
+
+**Use Cases:**
+- Home labs with DHCP servers
+- Networks where devices receive dynamic IP addresses
+- Mixed environments with both static and dynamic IPs
+- Tracking mobile devices that move between networks
+
+For detailed documentation, see [IP_CHANGE_DETECTION.md](IP_CHANGE_DETECTION.md).
+
+**hosts.json format with MAC addresses:**
+```json
+{
+  "my-pc": { "host": "192.168.1.50", "user": "user", "mac": "00:11:22:33:44:55" },
+  "server-1": { "host": "server.example.local", "user": "admin" },
+  "dhcp-laptop": { "host": "192.168.1.100", "user": "user", "mac": "AA:BB:CC:DD:EE:FF" }
+}
+```
 
 ### Managing the Local Server
 
@@ -442,9 +480,11 @@ hosts.json format
 {
   "my-pc": { "host": "192.168.1.50", "user": "user" },
   "server-1": { "host": "server.example.local", "user": "admin" },
-  "local-server": { "host": "localhost", "user": "ignored" }
+  "local-server": { "host": "localhost", "user": "ignored" },
+  "dhcp-device": { "host": "192.168.1.100", "user": "admin", "mac": "00:11:22:33:44:55" }
 }
 ```
+- The optional `mac` field enables IP change detection for DHCP hosts
 - You can edit `hosts.json` by hand, but the web UI will overwrite the file when hosts are added/edited/deleted. Back it up before manual edits.
 
 Backup and restore hosts.json
