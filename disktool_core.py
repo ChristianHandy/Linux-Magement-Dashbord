@@ -75,9 +75,39 @@ def init_db():
 
 def run(cmd):
     """Führt einen Shell-Befehl aus und gibt den gesamten Output zurück."""
-    # cmd is a list
+    # Validate that cmd is a list to prevent command injection
+    if not isinstance(cmd, list):
+        raise ValueError("Command must be a list, not a string")
+    
+    # Validate that cmd is not empty
+    if not cmd:
+        raise ValueError("Command list cannot be empty")
+    
+    # Validate that all arguments are strings
+    if not all(isinstance(arg, str) for arg in cmd):
+        raise ValueError("All command arguments must be strings")
+    
+    # Validate command executable (first element) doesn't contain path traversal or shell metacharacters
+    executable = cmd[0]
+    
+    # Check for control characters including null bytes
+    if any(ord(c) < 32 for c in executable):
+        raise ValueError(f"Invalid command executable: contains control characters")
+    
+    # Allow only alphanumeric, dash, and underscore for command names
+    # OR absolute paths that start with / and don't contain path traversal
+    if executable.startswith('/'):
+        # For absolute paths, ensure no path traversal patterns
+        if '..' in executable or not re.match(r'^/[a-zA-Z0-9/_-]+$', executable):
+            raise ValueError(f"Invalid command executable: path traversal detected")
+    else:
+        # For command names, only allow safe characters
+        if not re.match(r'^[a-zA-Z0-9_-]+$', executable):
+            raise ValueError(f"Invalid command executable: {executable}")
+    
     try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        # Explicitly set shell=False to prevent shell injection
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, shell=False)
         return res.stdout
     except Exception as e:
         return str(e)
