@@ -3,7 +3,13 @@
 
 <div class="container">
   <h2>Manage Hosts</h2>
-  <p><a class="btn" href="/dashboard">Back to Dashboard</a></p>
+  <p>
+    <a class="btn" href="/dashboard">Back to Dashboard</a>
+    {% if not current_user_id or 'operator' in current_user_roles or 'admin' in current_user_roles %}
+    <a class="btn" href="/hosts/arp_table">View ARP Table</a>
+    <a class="btn btn-primary" href="/hosts/scan_ip_changes">🔍 Scan for IP Changes</a>
+    {% endif %}
+  </p>
 
   {% with messages = get_flashed_messages() %}
     {% if messages %}
@@ -23,11 +29,18 @@
         {% endif %}
         <br>
         Host: {{ h.host }}<br>
-        User: {{ h.user }}<br><br>
+        User: {{ h.user }}<br>
+        {% if h.mac %}
+        MAC: {{ h.mac }}<br>
+        {% endif %}
+        <br>
         {% if not current_user_id or 'operator' in current_user_roles or 'admin' in current_user_roles %}
           <a class="btn" href="/hosts/edit/{{ name }}">Edit</a>
           {% if h.host.lower() not in localhost_identifiers %}
             <a class="btn" href="/hosts/install_key/{{ name }}">Install SSH key</a>
+            {% if not h.mac %}
+            <a class="btn btn-secondary" href="/hosts/detect_mac/{{ name }}">🔍 Detect MAC</a>
+            {% endif %}
           {% else %}
             <span class="text-muted">(No SSH key needed for localhost)</span>
           {% endif %}
@@ -47,6 +60,8 @@
     <p><strong><span aria-label="Tip">💡</span> Tip:</strong> You can manage this local server by using <code>localhost</code> as the host. 
     No SSH key is needed for localhost - updates will run directly on this machine.</p>
     <p><strong>Example:</strong> Display name: "Local Server", Host: "localhost", User: (any value, will be ignored)</p>
+    <p><strong><span aria-label="New">🆕</span> IP Change Detection:</strong> Add a MAC address to enable automatic IP detection for DHCP hosts. 
+    You can use the "Detect MAC" button to automatically discover it, or enter it manually.</p>
   </div>
   <form method="post" class="card">
     <label>Display name</label><br>
@@ -55,6 +70,8 @@
     <input name="host" placeholder="192.168.1.100 or localhost"><br><br>
     <label>User</label><br>
     <input name="user" placeholder="username (ignored for localhost)"><br><br>
+    <label>MAC Address (optional, for IP change detection)</label><br>
+    <input name="mac" placeholder="00:11:22:33:44:55"><br><br>
     <button class="btn" type="submit">Save</button>
   </form>
   {% else %}

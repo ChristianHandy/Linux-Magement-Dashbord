@@ -1,0 +1,49 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/static/style.css">
+
+<div class="container">
+  <h2>ARP Table</h2>
+  <p>
+    <a class="btn" href="/hosts">Back to Hosts</a>
+  </p>
+
+  <div class="card info-box">
+    <p><strong><span aria-label="Info">ℹ️</span> About ARP Table:</strong> 
+    The ARP (Address Resolution Protocol) table shows MAC address to IP address mappings 
+    for devices that have recently communicated with this server on the local network.</p>
+    <p>This information is used to detect IP address changes for hosts with known MAC addresses 
+    in DHCP environments where IP addresses may change over time.</p>
+  </div>
+
+  <h3>Current ARP Entries</h3>
+  {% if arp_mappings %}
+    <div class="card">
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th style="text-align: left; padding: 8px; border-bottom: 2px solid #ddd;">MAC Address</th>
+            <th style="text-align: left; padding: 8px; border-bottom: 2px solid #ddd;">IP Address</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for mac, ip in arp_mappings.items() %}
+          <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;">{{ mac }}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;">{{ ip }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p><em>Total entries: {{ arp_mappings|length }}</em></p>
+  {% else %}
+    <div class="card">
+      <p>No ARP entries found. This could mean:</p>
+      <ul>
+        <li>No devices have recently communicated with this server</li>
+        <li>The ARP cache has been cleared</li>
+        <li>You need to ping devices to populate the ARP table</li>
+      </ul>
+    </div>
+  {% endif %}
+</div>

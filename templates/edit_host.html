@@ -12,6 +12,8 @@
     <input name="host" value="{{ data.host }}"><br><br>
     <label>User</label><br>
     <input name="user" value="{{ data.user }}"><br><br>
+    <label>MAC Address (optional, for IP change detection)</label><br>
+    <input name="mac" value="{{ data.mac if data.mac else '' }}" placeholder="00:11:22:33:44:55"><br><br>
     <button class="btn" type="submit">Save</button>
   </form>
 </div>

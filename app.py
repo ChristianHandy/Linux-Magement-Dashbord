@@ -10,6 +10,7 @@ import version_manager
 import email_config
 import email_notifier
 from constants import is_localhost, LOCALHOST_IDENTIFIERS
+import arp_tracker
 
 # Load environment variables from .env file if python-dotenv is available
 try:
@@ -409,8 +410,12 @@ def manage_hosts():
         name = request.form.get("name", "").strip()
         host = request.form.get("host", "").strip()
         user = request.form.get("user", "").strip()
+        mac = request.form.get("mac", "").strip()
         if name:
-            hosts[name] = {"host": host, "user": user}
+            host_data = {"host": host, "user": user}
+            if mac:
+                host_data["mac"] = mac
+            hosts[name] = host_data
             save_hosts(hosts)
         return redirect("/hosts")
     return render_template("hosts.html", hosts=hosts)
@@ -431,11 +436,15 @@ def edit_host(orig_name):
         new_name = request.form.get("name", "").strip()
         host = request.form.get("host", "").strip()
         user = request.form.get("user", "").strip()
+        mac = request.form.get("mac", "").strip()
         if new_name:
             # If the name changed, remove the old key
             if new_name != orig_name:
                 hosts.pop(orig_name, None)
-            hosts[new_name] = {"host": host, "user": user}
+            host_data = {"host": host, "user": user}
+            if mac:
+                host_data["mac"] = mac
+            hosts[new_name] = host_data
             save_hosts(hosts)
         return redirect("/hosts")
     # GET
@@ -529,6 +538,86 @@ def install_key(name):
         except Exception as e:
             error = f"Connection error: {e}"
     return render_template("install_key.html", name=name, error=error, success=success)
+
+# ARP-based IP change detection routes
+@app.route("/hosts/detect_mac/<name>")
+@login_required
+def detect_mac(name):
+    """Detect MAC address for a host by pinging it and checking ARP table"""
+    # Require operator or admin role
+    if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+        flash('You need operator or admin role to detect MAC addresses.')
+        return redirect(url_for('manage_hosts'))
+    
+    hosts = load_hosts()
+    if name not in hosts:
+        flash(f'Host {name} not found')
+        return redirect(url_for('manage_hosts'))
+    
+    host_config = hosts[name]
+    ip = host_config['host']
+    
+    # Check if this is localhost
+    if is_localhost(ip):
+        flash('MAC address detection is not applicable for localhost.')
+        return redirect(url_for('manage_hosts'))
+    
+    # Ping the host to populate ARP table
+    if arp_tracker.ping_host(ip):
+        # Get MAC address from ARP table
+        mac = arp_tracker.get_mac_address_for_ip(ip)
+        if mac:
+            # Update host configuration with MAC address
+            host_config['mac'] = mac
+            hosts[name] = host_config
+            save_hosts(hosts)
+            flash(f'MAC address detected and saved for {name}: {mac}')
+        else:
+            flash(f'Host {name} is reachable but MAC address could not be detected from ARP table.')
+    else:
+        flash(f'Could not ping host {name} at {ip}. Make sure the host is online and reachable.')
+    
+    return redirect(url_for('manage_hosts'))
+
+@app.route("/hosts/scan_ip_changes")
+@login_required
+def scan_ip_changes():
+    """Scan for IP changes using ARP table"""
+    # Require operator or admin role
+    if session.get("user_id") and not current_user_has_role('operator', 'admin'):
+        flash('You need operator or admin role to scan for IP changes.')
+        return redirect(url_for('manage_hosts'))
+    
+    hosts = load_hosts()
+    
+    # Get current ARP table
+    arp_mappings = arp_tracker.get_arp_table()
+    
+    # Detect IP changes
+    changes = arp_tracker.detect_ip_changes(hosts, arp_mappings)
+    
+    if changes:
+        # Update host IPs
+        updated_hosts = arp_tracker.update_host_ips(hosts, changes)
+        save_hosts(updated_hosts)
+        
+        # Create flash message with changes
+        change_messages = []
+        for hostname, old_ip, new_ip in changes:
+            change_messages.append(f'{hostname}: {old_ip} → {new_ip}')
+        
+        flash(f"IP changes detected and updated: {', '.join(change_messages)}")
+    else:
+        flash('No IP changes detected.')
+    
+    return redirect(url_for('manage_hosts'))
+
+@app.route("/hosts/arp_table")
+@login_required
+def view_arp_table():
+    """View current ARP table"""
+    arp_mappings = arp_tracker.get_arp_table()
+    return render_template("arp_table.html", arp_mappings=arp_mappings)
 
 # ============================================================================
 # DISK TOOLS ROUTES (from Disk_Tools repository)
