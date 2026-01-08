@@ -45,6 +45,8 @@ def detect_os_remote(host, user):
     ssh = None
     try:
         ssh = paramiko.SSHClient()
+        # Security Note: AutoAddPolicy accepts any host key, making this vulnerable to MITM attacks.
+        # For production, use WarningPolicy or maintain a known_hosts file.
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(host, username=user, timeout=10)
         
