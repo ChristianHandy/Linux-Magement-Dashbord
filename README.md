@@ -23,6 +23,7 @@ A comprehensive web dashboard combining system update management and disk tools 
 ### System Update Manager
 - Trigger updates remotely on multiple Linux and Windows computers via SSH
 - **Cross-platform support** - Linux (Ubuntu, Debian, Fedora, CentOS, Arch) and Windows
+- **Multi-boot / Dual-boot support** - Automatic OS detection for PCs with multiple operating systems
 - **Windows Update support** - Automatic Windows system updates via PowerShell
 - **Windows software updates** - Software package updates via winget
 - **Automatic update scheduling** with configurable frequency (daily, weekly, monthly)
@@ -31,7 +32,7 @@ A comprehensive web dashboard combining system update management and disk tools 
 - **Full system updates** - Complete updates including configuration files
 - Mobile-friendly UI
 - Update history tracking with update type information
-- Online/offline host detection
+- Online/offline host detection with OS information display
 - Update status notifications
 - SSH key management
 
@@ -445,6 +446,17 @@ hosts.json format
   "local-server": { "host": "localhost", "user": "ignored" }
 }
 ```
+- OS information is automatically cached when detected:
+```json
+{
+  "dual-boot-pc": { 
+    "host": "192.168.1.100", 
+    "user": "admin",
+    "os_name": "ubuntu",
+    "os_version": "22.04"
+  }
+}
+```
 - You can edit `hosts.json` by hand, but the web UI will overwrite the file when hosts are added/edited/deleted. Back it up before manual edits.
 
 Backup and restore hosts.json
@@ -452,6 +464,39 @@ Backup and restore hosts.json
   - cp hosts.json hosts.json.bak
 - Restore:
   - mv hosts.json.bak hosts.json
+
+## Multi-boot / Dual-boot Support
+
+The dashboard now supports managing PCs with multiple operating systems (e.g., Windows and Linux on the same machine).
+
+### How It Works
+
+For systems with multiple OSes:
+1. **Add the host once** with its IP address or hostname
+2. **Detect the current OS** by clicking "Detect OS" on the Manage Hosts page
+3. **Run updates** - the dashboard automatically uses the correct commands for the detected OS
+4. **After rebooting into a different OS**, click "Detect OS" again to update the information
+
+### Key Features
+
+- **Automatic OS detection**: Identifies Ubuntu, Debian, Fedora, CentOS, Arch Linux, and Windows
+- **Visual indicators**: Shows OS name, version, and platform badges (🪟 for Windows, 🐧 for Linux)
+- **Smart command selection**: Automatically uses the right package manager (apt-get, dnf, yum, pacman, or PowerShell)
+- **OS information caching**: Remembers the detected OS to avoid repeated detection
+
+### Example: Managing a Windows/Linux Dual-boot PC
+
+```
+1. Boot into Windows 11
+2. Add host: "My PC", 192.168.1.100, john
+3. Click "Detect OS" → Shows "Windows 10" 🪟
+4. Run "Full Update" → Uses Windows Update + winget
+5. Reboot into Ubuntu 22.04
+6. Click "Detect OS" → Shows "Ubuntu 22.04" 🐧
+7. Run "Full Update" → Uses apt-get
+```
+
+For detailed information, see [MULTIBOOT_SUPPORT.md](MULTIBOOT_SUPPORT.md).
 
 ## Automatic Update Configuration
 
