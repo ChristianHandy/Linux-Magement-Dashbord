@@ -1,67 +1,108 @@
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="/static/style.css">
+{% extends "base.html" %}
 
-<div class="container">
-<h2>Linux Management Dashboard</h2>
+{% block title %}Home — Linux Management Dashboard{% endblock %}
+{% block page_icon %}&#x1F3E0;{% endblock %}
+{% block page_title %}Home{% endblock %}
 
-{% with messages = get_flashed_messages() %}
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert">{{ message }}</div>
-    {% endfor %}
-  {% endif %}
-{% endwith %}
+{% block content %}
 
 {% if update_notification %}
-<div class="card" style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); border: 2px solid #60a5fa;">
-  <h3 style="color: #dbeafe; margin-bottom: 0.5rem;">🔔 Dashboard Update Available!</h3>
-  <p style="color: #bfdbfe; margin-bottom: 1rem;">
+<div class="card card-blue" style="margin-bottom:1.5rem;">
+  <div class="card-header">
+    <h3>&#x1F514; Dashboard Update Available</h3>
+    <span class="badge badge-blue">{{ update_notification.type }}</span>
+  </div>
+  <p>
     <strong>{{ update_notification.description }}</strong><br>
-    Version: {{ update_notification.version }} ({{ update_notification.type }})
+    <span class="text-muted">Version {{ update_notification.version }}</span>
   </p>
-  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+  <div class="btn-group">
     {% if is_admin %}
-    <a class="btn" href="/dashboard_version/update" style="background: #059669;">
-      Update Now
-    </a>
+    <a class="btn btn-success btn-sm" href="/dashboard_version/update">&#x2B06; Update Now</a>
     {% endif %}
-    <a class="btn" href="/dashboard_version/check" style="background: #7c3aed;">
-      Check Again
-    </a>
+    <a class="btn btn-purple btn-sm" href="/dashboard_version/check">&#x1F504; Check Again</a>
     {% if update_notification.url %}
-    <a class="btn" href="{{ update_notification.url }}" target="_blank" style="background: #475569;">
-      View on GitHub
-    </a>
+    <a class="btn btn-secondary btn-sm" href="{{ update_notification.url }}" target="_blank">&#x1F517; View on GitHub</a>
     {% endif %}
-    <a class="btn" href="/dashboard_version/dismiss" style="background: #64748b;">
-      Dismiss
-    </a>
+    <a class="btn btn-ghost btn-sm" href="/dashboard_version/dismiss">&#x2715; Dismiss</a>
   </div>
 </div>
 {% endif %}
 
-<div class="card">
-  <h3>System Update Manager</h3>
-  <p>Monitor and update multiple Linux computers remotely via SSH</p>
-  <a class="btn" href="/dashboard">Go to Update Dashboard</a>
-  <a class="btn" href="/update_settings" style="background: #059669; margin-left: 0.5rem;">Update Settings</a>
-  <a class="btn" href="/email_settings" style="background: #7c3aed; margin-left: 0.5rem;">Email Configuration</a>
+<!-- Quick Stats -->
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-card-icon blue">&#x1F5A7;</div>
+    <div class="stat-card-value">&#x2014;</div>
+    <div class="stat-card-label">Managed Hosts</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card-icon green">&#x1F4BE;</div>
+    <div class="stat-card-value">&#x2014;</div>
+    <div class="stat-card-label">Disk Drives</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card-icon purple">&#x1F504;</div>
+    <div class="stat-card-value">&#x2014;</div>
+    <div class="stat-card-label">Updates Run</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card-icon amber">&#x1F465;</div>
+    <div class="stat-card-value">&#x2014;</div>
+    <div class="stat-card-label">Active Users</div>
+  </div>
 </div>
 
-<div class="card">
-  <h3>Disk Management Tools</h3>
-  <p>Format, test, and validate disk drives with SMART monitoring</p>
-  <a class="btn" href="/disks">Go to Disk Tools</a>
+<!-- Navigation Cards -->
+<div class="host-grid">
+
+  <div class="card">
+    <div class="card-header">
+      <h3>&#x1F504; System Update Manager</h3>
+      <span class="badge badge-blue">Core</span>
+    </div>
+    <p>Monitor and update multiple Linux computers remotely via SSH. View host status, trigger updates, and review history.</p>
+    <div class="btn-group" style="margin-top:0.75rem;">
+      <a class="btn btn-primary btn-sm" href="/dashboard">Open Dashboard</a>
+      <a class="btn btn-success btn-sm" href="/update_settings">Settings</a>
+      <a class="btn btn-secondary btn-sm" href="/email_settings">&#x2709; Email</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>&#x1F4BE; Disk Management</h3>
+      <span class="badge badge-purple">Tools</span>
+    </div>
+    <p>Format, test, and validate disk drives with SMART monitoring. Track disk health and manage storage devices.</p>
+    <div class="btn-group" style="margin-top:0.75rem;">
+      <a class="btn btn-primary btn-sm" href="/disks">Open Disk Tools</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>&#x1F5A7; Host Management</h3>
+      <span class="badge badge-green">Network</span>
+    </div>
+    <p>Add, edit, and remove managed hosts. Configure SSH keys, detect MAC addresses, and scan for IP changes.</p>
+    <div class="btn-group" style="margin-top:0.75rem;">
+      <a class="btn btn-primary btn-sm" href="/hosts">Manage Hosts</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>&#x1F464; User &amp; Profile</h3>
+      <span class="badge badge-amber">Account</span>
+    </div>
+    <p>Manage your profile, update credentials, and administer user accounts and roles.</p>
+    <div class="btn-group" style="margin-top:0.75rem;">
+      <a class="btn btn-primary btn-sm" href="/users/profile">My Profile</a>
+      <a class="btn btn-secondary btn-sm" href="/users">User Admin</a>
+    </div>
+  </div>
+
 </div>
 
-<div class="card">
-  <h3>User Profile & Settings</h3>
-  <p>Manage your profile and account settings</p>
-  <a class="btn" href="/users/profile">My Profile</a>
-  <a class="btn" href="/users">User Management (Admin)</a>
-</div>
-
-<div class="card">
-  <a class="btn" href="/logout">Logout</a>
-</div>
-</div>
+{% endblock %}

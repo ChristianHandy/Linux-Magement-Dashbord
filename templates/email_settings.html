@@ -1,202 +1,160 @@
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="/static/style.css">
+{% extends "base.html" %}
 
-<div class="container">
-<h2>Email Configuration</h2>
+{% block title %}Email Configuration — Linux Management{% endblock %}
+{% block page_icon %}&#x2709;{% endblock %}
+{% block page_title %}Email Configuration{% endblock %}
 
-<p><a class="btn" href="/index">← Back to Main Menu</a></p>
+{% block content %}
 
-{% with messages = get_flashed_messages() %}
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert">{{ message }}</div>
-    {% endfor %}
-  {% endif %}
-{% endwith %}
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
 
-<div class="card">
-  <h3>Email Settings</h3>
-  <form method="POST" action="/email_settings">
-    <div style="margin-bottom: 1.5rem;">
-      <label style="display: flex; align-items: center; cursor: pointer;">
-        <input type="checkbox" name="email_enabled" 
-               {% if settings.email_enabled %}checked{% endif %}
-               style="margin-right: 0.5rem; width: 20px; height: 20px; cursor: pointer;">
-        <span style="font-weight: bold;">Enable Email Notifications</span>
-      </label>
-      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
-        Master switch for all email notifications. When disabled, no emails will be sent.
-      </p>
-    </div>
+  <!-- Left Column: SMTP Settings -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <h3>&#x2699; SMTP Settings</h3>
+      </div>
+      <form method="POST" action="/email_settings">
 
-    <div style="margin-bottom: 1.5rem;">
-      <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">
-        SMTP Server
-      </label>
-      <input type="text" name="smtp_server" value="{{ settings.smtp_server }}" 
-             placeholder="smtp.gmail.com"
-             style="width: 100%; padding: 0.6rem; background: #1e293b; color: #e5e7eb; border: 1px solid #334155; border-radius: 8px; font-size: 1rem;">
-      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
-        SMTP server hostname (e.g., smtp.gmail.com, smtp.office365.com)
-      </p>
-    </div>
+        <div class="form-check">
+          <input type="checkbox" name="email_enabled" id="email_enabled"
+                 {% if settings.email_enabled %}checked{% endif %}>
+          <label class="form-check-label" for="email_enabled">
+            <strong>Enable Email Notifications</strong>
+            <span>Master switch — when disabled, no emails will be sent.</span>
+          </label>
+        </div>
 
-    <div style="margin-bottom: 1.5rem;">
-      <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">
-        SMTP Port
-      </label>
-      <input type="number" name="smtp_port" value="{{ settings.smtp_port }}" 
-             placeholder="587"
-             style="width: 100%; padding: 0.6rem; background: #1e293b; color: #e5e7eb; border: 1px solid #334155; border-radius: 8px; font-size: 1rem;">
-      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
-        SMTP port number (587 for TLS, 465 for SSL, 25 for unencrypted)
-      </p>
-    </div>
+        <div class="form-group">
+          <label class="form-label">SMTP Server</label>
+          <input type="text" name="smtp_server" value="{{ settings.smtp_server }}"
+                 placeholder="smtp.gmail.com">
+          <p class="form-hint">e.g. smtp.gmail.com, smtp.office365.com</p>
+        </div>
 
-    <div style="margin-bottom: 1.5rem;">
-      <label style="display: flex; align-items: center; cursor: pointer;">
-        <input type="checkbox" name="smtp_use_tls" 
-               {% if settings.smtp_use_tls %}checked{% endif %}
-               style="margin-right: 0.5rem; width: 20px; height: 20px; cursor: pointer;">
-        <span style="font-weight: bold;">Use TLS</span>
-      </label>
-      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
-        Enable TLS encryption (recommended for port 587)
-      </p>
-    </div>
+        <div class="form-group">
+          <label class="form-label">SMTP Port</label>
+          <input type="number" name="smtp_port" value="{{ settings.smtp_port }}"
+                 placeholder="587">
+          <p class="form-hint">587 (TLS) &nbsp;|&nbsp; 465 (SSL) &nbsp;|&nbsp; 25 (unencrypted)</p>
+        </div>
 
-    <div style="margin-bottom: 1.5rem;">
-      <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">
-        SMTP Username
-      </label>
-      <input type="text" name="smtp_username" value="{{ settings.smtp_username }}" 
-             placeholder="your-email@example.com"
-             style="width: 100%; padding: 0.6rem; background: #1e293b; color: #e5e7eb; border: 1px solid #334155; border-radius: 8px; font-size: 1rem;">
-      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
-        SMTP authentication username (usually your email address)
-      </p>
-    </div>
+        <div class="form-check">
+          <input type="checkbox" name="smtp_use_tls" id="smtp_use_tls"
+                 {% if settings.smtp_use_tls %}checked{% endif %}>
+          <label class="form-check-label" for="smtp_use_tls">
+            <strong>Use TLS Encryption</strong>
+            <span>Recommended for port 587.</span>
+          </label>
+        </div>
 
-    <div style="margin-bottom: 1.5rem;">
-      <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">
-        SMTP Password
-      </label>
-      <input type="password" name="smtp_password" value="{{ settings.smtp_password }}" 
-             placeholder="Enter password or app-specific password"
-             style="width: 100%; padding: 0.6rem; background: #1e293b; color: #e5e7eb; border: 1px solid #334155; border-radius: 8px; font-size: 1rem;">
-      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
-        SMTP authentication password (for Gmail, use an app-specific password)
-      </p>
-    </div>
+        <div class="form-group">
+          <label class="form-label">SMTP Username</label>
+          <input type="text" name="smtp_username" value="{{ settings.smtp_username }}"
+                 placeholder="your-email@example.com">
+          <p class="form-hint">Usually your email address.</p>
+        </div>
 
-    <div style="margin-bottom: 1.5rem;">
-      <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">
-        Sender Email
-      </label>
-      <input type="email" name="sender_email" value="{{ settings.sender_email }}" 
-             placeholder="dashboard@example.com"
-             style="width: 100%; padding: 0.6rem; background: #1e293b; color: #e5e7eb; border: 1px solid #334155; border-radius: 8px; font-size: 1rem;">
-      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
-        Email address that will appear as the sender
-      </p>
-    </div>
+        <div class="form-group">
+          <label class="form-label">SMTP Password</label>
+          <input type="password" name="smtp_password" value="{{ settings.smtp_password }}"
+                 placeholder="Password or app-specific password">
+          <p class="form-hint">For Gmail, use an app-specific password.</p>
+        </div>
 
-    <div style="margin-bottom: 1.5rem;">
-      <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">
-        Recipient Emails
-      </label>
-      <textarea name="recipient_emails" rows="3"
-                placeholder="admin@example.com (one per line)"
-                style="width: 100%; padding: 0.6rem; background: #1e293b; color: #e5e7eb; border: 1px solid #334155; border-radius: 8px; font-size: 1rem; font-family: inherit; resize: vertical;">{{ settings.recipient_emails|join('\n') }}</textarea>
-      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
-        Email addresses to receive notifications (one per line)
-      </p>
-    </div>
+        <div class="form-group">
+          <label class="form-label">Sender Email</label>
+          <input type="email" name="sender_email" value="{{ settings.sender_email }}"
+                 placeholder="dashboard@example.com">
+        </div>
 
-    <button type="submit" class="btn" style="margin-right: 0.5rem;">Save Settings</button>
-    <button type="submit" name="test_email" value="true" class="btn" style="background: #059669; margin-right: 0.5rem;">Send Test Email</button>
-    <a class="btn" href="/index" style="background: #475569;">Cancel</a>
-  </form>
-</div>
+        <div class="form-group">
+          <label class="form-label">Recipient Emails</label>
+          <textarea name="recipient_emails" rows="3"
+                    placeholder="admin@example.com&#10;ops@example.com">{{ settings.recipient_emails|join('\n') }}</textarea>
+          <p class="form-hint">One email address per line.</p>
+        </div>
 
-<div class="card">
-  <h3>Report Configuration</h3>
-  <form method="POST" action="/email_settings">
-    <div style="margin-bottom: 1.5rem;">
-      <label style="display: flex; align-items: center; cursor: pointer;">
-        <input type="checkbox" name="report_enabled" 
-               {% if settings.report_enabled %}checked{% endif %}
-               style="margin-right: 0.5rem; width: 20px; height: 20px; cursor: pointer;">
-        <span style="font-weight: bold;">Enable Scheduled Reports</span>
-      </label>
-      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
-        Send periodic system status reports via email
-      </p>
-    </div>
-
-    <div style="margin-bottom: 1.5rem;">
-      <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">
-        Report Interval
-      </label>
-      <select name="report_interval" 
-              style="width: 100%; padding: 0.6rem; background: #1e293b; color: #e5e7eb; border: 1px solid #334155; border-radius: 8px; font-size: 1rem;">
-        <option value="daily" {% if settings.report_interval == 'daily' %}selected{% endif %}>Daily</option>
-        <option value="weekly" {% if settings.report_interval == 'weekly' %}selected{% endif %}>Weekly</option>
-        <option value="monthly" {% if settings.report_interval == 'monthly' %}selected{% endif %}>Monthly</option>
-      </select>
-      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
-        How often to send system status reports
-      </p>
-    </div>
-
-    <div style="margin-bottom: 1.5rem;">
-      <label style="display: flex; align-items: center; cursor: pointer;">
-        <input type="checkbox" name="error_notifications_enabled" 
-               {% if settings.error_notifications_enabled %}checked{% endif %}
-               style="margin-right: 0.5rem; width: 20px; height: 20px; cursor: pointer;">
-        <span style="font-weight: bold;">Enable Error Notifications</span>
-      </label>
-      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
-        Send immediate email notifications when system updates fail
-      </p>
-    </div>
-
-    <button type="submit" class="btn">Save Report Settings</button>
-  </form>
-</div>
-
-<div class="card">
-  <h3>Important Notes</h3>
-  <ul style="line-height: 1.8; color: #cbd5e1;">
-    <li><strong>Gmail Users:</strong> Use an app-specific password instead of your regular password. Enable 2-factor authentication and generate an app password in your Google Account settings.</li>
-    <li><strong>Office 365:</strong> Use your full email address as the username and enable Modern Authentication if required by your organization.</li>
-    <li><strong>Security:</strong> Email credentials are stored in plain text in email_settings.json. Ensure proper file permissions and consider using environment variables for production.</li>
-    <li><strong>Testing:</strong> Use the "Send Test Email" button to verify your configuration before enabling automatic reports.</li>
-    <li><strong>Port Selection:</strong> Port 587 with TLS is recommended for most email providers. Port 465 uses SSL, and port 25 is typically unencrypted.</li>
-  </ul>
-</div>
-
-<div class="card">
-  <h3>Email Features</h3>
-  <div style="display: grid; gap: 1rem;">
-    <div style="padding: 1rem; background: #1e293b; border-radius: 8px;">
-      <strong style="color: #3b82f6;">📊 Scheduled Reports</strong>
-      <p style="margin: 0.5rem 0 0 0; color: #cbd5e1; font-size: 0.9rem;">
-        Receive regular system status reports with host online/offline status and recent update history.
-      </p>
-    </div>
-    <div style="padding: 1rem; background: #1e293b; border-radius: 8px;">
-      <strong style="color: #ef4444;">⚠️ Error Notifications</strong>
-      <p style="margin: 0.5rem 0 0 0; color: #cbd5e1; font-size: 0.9rem;">
-        Get immediate alerts when system updates fail, including error details and troubleshooting information.
-      </p>
-    </div>
-    <div style="padding: 1rem; background: #1e293b; border-radius: 8px;">
-      <strong style="color: #10b981;">✉️ HTML Emails</strong>
-      <p style="margin: 0.5rem 0 0 0; color: #cbd5e1; font-size: 0.9rem;">
-        Professional HTML-formatted emails with both text and rich formatting for better readability.
-      </p>
+        <div class="btn-group">
+          <button type="submit" class="btn btn-primary">&#x1F4BE; Save Settings</button>
+          <button type="submit" name="test_email" value="true" class="btn btn-success">&#x2709; Send Test Email</button>
+          <a class="btn btn-ghost" href="/index">Cancel</a>
+        </div>
+      </form>
     </div>
   </div>
+
+  <!-- Right Column: Reports + Notes -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <h3>&#x1F4CA; Report Configuration</h3>
+      </div>
+      <form method="POST" action="/email_settings">
+
+        <div class="form-check">
+          <input type="checkbox" name="report_enabled" id="report_enabled"
+                 {% if settings.report_enabled %}checked{% endif %}>
+          <label class="form-check-label" for="report_enabled">
+            <strong>Enable Scheduled Reports</strong>
+            <span>Send periodic system status reports via email.</span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Report Interval</label>
+          <select name="report_interval">
+            <option value="daily"   {% if settings.report_interval == 'daily'   %}selected{% endif %}>Daily</option>
+            <option value="weekly"  {% if settings.report_interval == 'weekly'  %}selected{% endif %}>Weekly</option>
+            <option value="monthly" {% if settings.report_interval == 'monthly' %}selected{% endif %}>Monthly</option>
+          </select>
+        </div>
+
+        <div class="form-check">
+          <input type="checkbox" name="error_notifications_enabled" id="error_notif"
+                 {% if settings.error_notifications_enabled %}checked{% endif %}>
+          <label class="form-check-label" for="error_notif">
+            <strong>Enable Error Notifications</strong>
+            <span>Immediate alerts when system updates fail.</span>
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary">&#x1F4BE; Save Report Settings</button>
+      </form>
+    </div>
+
+    <!-- Features -->
+    <div class="card">
+      <h3 style="margin-bottom:1rem;">&#x2728; Email Features</h3>
+      <div class="feature-grid" style="grid-template-columns:1fr;">
+        <div class="feature-item">
+          <div class="feature-item-title text-blue">&#x1F4CA; Scheduled Reports</div>
+          <div class="feature-item-desc">Regular system status reports with host online/offline status and recent update history.</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-title text-red">&#x26A0; Error Notifications</div>
+          <div class="feature-item-desc">Immediate alerts when system updates fail, including error details and troubleshooting info.</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-title text-green">&#x2709; HTML Emails</div>
+          <div class="feature-item-desc">Professional HTML-formatted emails with rich formatting for better readability.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="card card-amber">
+      <h3 style="margin-bottom:0.75rem;">&#x1F4DD; Important Notes</h3>
+      <ul style="font-size:0.875rem; line-height:1.8;">
+        <li><strong>Gmail:</strong> Use an app-specific password. Enable 2FA and generate an app password in Google Account settings.</li>
+        <li><strong>Office 365:</strong> Use your full email address as username and enable Modern Authentication if required.</li>
+        <li><strong>Security:</strong> Credentials are stored in <code>email_settings.json</code>. Ensure proper file permissions.</li>
+        <li><strong>Testing:</strong> Use "Send Test Email" to verify your configuration before enabling automatic reports.</li>
+        <li><strong>Port:</strong> Port 587 with TLS is recommended for most providers.</li>
+      </ul>
+    </div>
+  </div>
+
 </div>
-</div>
+
+{% endblock %}

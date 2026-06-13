@@ -1,19 +1,25 @@
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="/static/style.css">
+{% extends "base.html" %}
 
-<div class="container">
-<h3>Update Progress</h3>
+{% block title %}Update Progress — Linux Management{% endblock %}
+{% block page_icon %}&#x23F3;{% endblock %}
+{% block page_title %}Update Progress{% endblock %}
 
-<p><a class="btn" href="/dashboard">← Back to Dashboard</a></p>
+{% block head %}
+<meta http-equiv="refresh" content="2">
+{% endblock %}
 
-<pre>
-{% for line in log %}
-{{ line }}
-{% endfor %}
-</pre>
+{% block content %}
 
-<p>Auto-refreshing…</p>
+<div class="card">
+  <div class="card-header">
+    <h3>&#x23F3; Running Update...</h3>
+    <span class="badge badge-amber">Live</span>
+  </div>
+  <p class="text-muted" style="margin-bottom:1rem;">This page refreshes automatically every 2 seconds.</p>
+  <pre>{% for line in log %}{{ line }}
+{% endfor %}</pre>
 </div>
 
-<meta http-equiv="refresh" content="2">
+<a class="btn btn-ghost btn-sm" href="/dashboard">&#x2190; Back to Dashboard</a>
 
+{% endblock %}

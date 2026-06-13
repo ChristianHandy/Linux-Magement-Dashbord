@@ -1,80 +1,113 @@
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="/static/style.css">
+{% extends "base.html" %}
 
-<div class="container">
-  <h2>Manage Hosts</h2>
-  <p>
-    <a class="btn" href="/dashboard">Back to Dashboard</a>
-    {% if not current_user_id or 'operator' in current_user_roles or 'admin' in current_user_roles %}
-    <a class="btn" href="/hosts/arp_table">View ARP Table</a>
-    <a class="btn btn-primary" href="/hosts/scan_ip_changes">🔍 Scan for IP Changes</a>
-    {% endif %}
-  </p>
+{% block title %}Manage Hosts — Linux Management{% endblock %}
+{% block page_icon %}&#x1F5A7;{% endblock %}
+{% block page_title %}Manage Hosts{% endblock %}
 
-  {% with messages = get_flashed_messages() %}
-    {% if messages %}
-      {% for message in messages %}
-        <div class="alert">{{ message }}</div>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
+{% block topbar_actions %}
+<a class="btn btn-secondary btn-sm" href="/dashboard">&#x1F504; Dashboard</a>
+{% if not current_user_id or 'operator' in current_user_roles or 'admin' in current_user_roles %}
+<a class="btn btn-secondary btn-sm" href="/hosts/arp_table">&#x1F4CB; ARP Table</a>
+<a class="btn btn-primary btn-sm" href="/hosts/scan_ip_changes">&#x1F50D; Scan IPs</a>
+{% endif %}
+{% endblock %}
 
-  <h3>Existing Hosts</h3>
-  {% if hosts %}
-    {% for name, h in hosts.items() %}
-      <div class="card">
-        <b>{{ name }}</b>
-        {% if h.host.lower() in localhost_identifiers %}
-          <span class="badge-local">LOCAL</span>
-        {% endif %}
-        <br>
-        Host: {{ h.host }}<br>
-        User: {{ h.user }}<br>
-        {% if h.mac %}
-        MAC: {{ h.mac }}<br>
-        {% endif %}
-        <br>
-        {% if not current_user_id or 'operator' in current_user_roles or 'admin' in current_user_roles %}
-          <a class="btn" href="/hosts/edit/{{ name }}">Edit</a>
-          {% if h.host.lower() not in localhost_identifiers %}
-            <a class="btn" href="/hosts/install_key/{{ name }}">Install SSH key</a>
-            {% if not h.mac %}
-            <a class="btn btn-secondary" href="/hosts/detect_mac/{{ name }}">🔍 Detect MAC</a>
-            {% endif %}
-          {% else %}
-            <span class="text-muted">(No SSH key needed for localhost)</span>
-          {% endif %}
-          <form action="/hosts/delete/{{ name }}" method="post" style="display:inline">
-            <button class="btn" type="submit" onclick="return confirm('Are you sure?')">Delete</button>
-          </form>
-        {% endif %}
-      </div>
-    {% endfor %}
-  {% else %}
-    <p>No hosts configured yet.</p>
-  {% endif %}
+{% block content %}
 
-  {% if not current_user_id or 'operator' in current_user_roles or 'admin' in current_user_roles %}
-  <h3>Add / Update Host</h3>
-  <div class="card info-box">
-    <p><strong><span aria-label="Tip">💡</span> Tip:</strong> You can manage this local server by using <code>localhost</code> as the host. 
-    No SSH key is needed for localhost - updates will run directly on this machine.</p>
-    <p><strong>Example:</strong> Display name: "Local Server", Host: "localhost", User: (any value, will be ignored)</p>
-    <p><strong><span aria-label="New">🆕</span> IP Change Detection:</strong> Add a MAC address to enable automatic IP detection for DHCP hosts. 
-    You can use the "Detect MAC" button to automatically discover it, or enter it manually.</p>
-  </div>
-  <form method="post" class="card">
-    <label>Display name</label><br>
-    <input name="name" placeholder="Friendly name"><br><br>
-    <label>Host (IP or hostname)</label><br>
-    <input name="host" placeholder="192.168.1.100 or localhost"><br><br>
-    <label>User</label><br>
-    <input name="user" placeholder="username (ignored for localhost)"><br><br>
-    <label>MAC Address (optional, for IP change detection)</label><br>
-    <input name="mac" placeholder="00:11:22:33:44:55"><br><br>
-    <button class="btn" type="submit">Save</button>
-  </form>
-  {% else %}
-  <p><em>You need operator or admin role to manage hosts.</em></p>
-  {% endif %}
+<!-- Existing Hosts -->
+<div class="card-header" style="margin-bottom:1rem; padding:0;">
+  <h3>&#x1F5A7; Existing Hosts</h3>
+  <span class="badge badge-blue">{{ hosts|length if hosts else 0 }} hosts</span>
 </div>
+
+{% if hosts %}
+<div class="host-grid">
+  {% for name, h in hosts.items() %}
+  <div class="host-card">
+    <div class="host-card-header">
+      <div>
+        <div class="host-card-name">
+          {{ name }}
+          {% if h.host.lower() in localhost_identifiers %}
+            <span class="badge-local" style="margin-left:0.5rem;">LOCAL</span>
+          {% endif %}
+        </div>
+        <div class="host-card-meta">
+          <span>&#x1F4BB; {{ h.host }}</span> &nbsp;&bull;&nbsp;
+          <span>&#x1F464; {{ h.user }}</span>
+          {% if h.mac %}
+          &nbsp;&bull;&nbsp; <span>&#x1F4F6; {{ h.mac }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if not current_user_id or 'operator' in current_user_roles or 'admin' in current_user_roles %}
+    <div class="host-card-actions">
+      <a class="btn btn-secondary btn-sm" href="/hosts/edit/{{ name }}">&#x270F; Edit</a>
+      {% if h.host.lower() not in localhost_identifiers %}
+        <a class="btn btn-primary btn-sm" href="/hosts/install_key/{{ name }}">&#x1F511; SSH Key</a>
+        {% if not h.mac %}
+        <a class="btn btn-ghost btn-sm" href="/hosts/detect_mac/{{ name }}">&#x1F50D; Detect MAC</a>
+        {% endif %}
+      {% else %}
+        <span class="text-muted" style="font-size:0.78rem;">No SSH key needed</span>
+      {% endif %}
+      <form action="/hosts/delete/{{ name }}" method="post" style="display:inline; margin:0;">
+        <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete host \'{{ name }}\'?')">&#x1F5D1; Delete</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="empty-state-icon">&#x1F5A7;</div>
+  <h3>No hosts configured</h3>
+  <p>Add your first host below to start managing remote Linux systems.</p>
+</div>
+{% endif %}
+
+<!-- Add Host Form -->
+{% if not current_user_id or 'operator' in current_user_roles or 'admin' in current_user_roles %}
+<div style="margin-top:2rem;">
+  <div class="card-header" style="margin-bottom:1rem; padding:0;">
+    <h3>&#x2795; Add / Update Host</h3>
+  </div>
+
+  <div class="info-box">
+    <p><strong>&#x1F4A1; Tip:</strong> Use <code>localhost</code> as the host to manage this local server directly — no SSH key required.</p>
+    <p><strong>Example:</strong> Display name: <em>Local Server</em>, Host: <em>localhost</em>, User: <em>(any value)</em></p>
+    <p><strong>&#x1F195; IP Change Detection:</strong> Add a MAC address to enable automatic IP detection for DHCP hosts. Use the "Detect MAC" button or enter it manually.</p>
+  </div>
+
+  <div class="card">
+    <form method="post">
+      <div class="form-group">
+        <label class="form-label">Display Name</label>
+        <input class="form-control" name="name" placeholder="e.g. Web Server, NAS, Workstation">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Host (IP or Hostname)</label>
+        <input class="form-control" name="host" placeholder="192.168.1.100 or localhost">
+      </div>
+      <div class="form-group">
+        <label class="form-label">SSH User</label>
+        <input class="form-control" name="user" placeholder="username (ignored for localhost)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">MAC Address <span class="text-muted">(optional, for IP change detection)</span></label>
+        <input class="form-control" name="mac" placeholder="00:11:22:33:44:55">
+      </div>
+      <button class="btn btn-primary" type="submit">&#x1F4BE; Save Host</button>
+    </form>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-warning" style="margin-top:1.5rem;">
+  &#x26A0; You need <strong>operator</strong> or <strong>admin</strong> role to manage hosts.
+</div>
+{% endif %}
+
+{% endblock %}

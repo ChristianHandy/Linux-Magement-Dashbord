@@ -1,107 +1,108 @@
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="/static/style.css">
+{% extends "base.html" %}
 
-<div class="container">
-<h2>Automatic Update Settings</h2>
+{% block title %}Update Settings — Linux Management{% endblock %}
+{% block page_icon %}&#x2699;{% endblock %}
+{% block page_title %}Automatic Update Settings{% endblock %}
 
-<p><a class="btn" href="/dashboard">← Back to Dashboard</a></p>
+{% block content %}
 
-{% with messages = get_flashed_messages() %}
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert">{{ message }}</div>
-    {% endfor %}
-  {% endif %}
-{% endwith %}
+<div style="display:grid; grid-template-columns:2fr 1fr; gap:1.5rem;">
 
-<div class="card">
-  <h3>Automatic Update Configuration</h3>
-  <form method="POST" action="/update_settings">
-    <div style="margin-bottom: 1.5rem;">
-      <label style="display: flex; align-items: center; cursor: pointer;">
-        <input type="checkbox" name="automatic_updates_enabled" 
-               {% if settings.automatic_updates_enabled %}checked{% endif %}
-               style="margin-right: 0.5rem; width: 20px; height: 20px; cursor: pointer;">
-        <span style="font-weight: bold;">Enable Automatic Updates</span>
-      </label>
-      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
-        When enabled, the system will automatically update all configured hosts at the specified frequency.
-        Updates will run in the background without manual intervention.
-      </p>
+  <!-- Left: Main Form -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <h3>&#x2699; Update Configuration</h3>
+      </div>
+      <form method="POST" action="/update_settings">
+
+        <div class="form-check">
+          <input type="checkbox" name="automatic_updates_enabled" id="auto_updates"
+                 {% if settings.automatic_updates_enabled %}checked{% endif %}>
+          <label class="form-check-label" for="auto_updates">
+            <strong>Enable Automatic Updates</strong>
+            <span>Automatically update all configured hosts at the specified frequency without manual intervention.</span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Update Frequency</label>
+          <select name="update_frequency">
+            <option value="daily"   {% if settings.update_frequency == 'daily'   %}selected{% endif %}>Daily</option>
+            <option value="weekly"  {% if settings.update_frequency == 'weekly'  %}selected{% endif %}>Weekly</option>
+            <option value="monthly" {% if settings.update_frequency == 'monthly' %}selected{% endif %}>Monthly</option>
+          </select>
+          <p class="form-hint">Daily = most secure; Weekly/Monthly = better for stable production environments.</p>
+        </div>
+
+        <div class="form-check">
+          <input type="checkbox" name="notification_enabled" id="notif_enabled"
+                 {% if settings.notification_enabled %}checked{% endif %}>
+          <label class="form-check-label" for="notif_enabled">
+            <strong>Enable Update Notifications</strong>
+            <span>Show notifications about update status and completion in the dashboard.</span>
+          </label>
+        </div>
+
+        <div class="form-check">
+          <input type="checkbox" name="dashboard_update_notifications" id="dash_notif"
+                 {% if settings.dashboard_update_notifications %}checked{% endif %}>
+          <label class="form-check-label" for="dash_notif">
+            <strong>Dashboard Update Notifications</strong>
+            <span>Get notified when a new version of the Linux Management Dashboard is available. Checks daily.</span>
+          </label>
+        </div>
+
+        {% if settings.last_auto_update %}
+        <div class="info-box" style="margin-top:1rem;">
+          <p><strong>&#x1F552; Last Automatic Update:</strong> {{ settings.last_auto_update }}</p>
+        </div>
+        {% endif %}
+
+        <div class="btn-group" style="margin-top:1rem;">
+          <button type="submit" class="btn btn-primary">&#x1F4BE; Save Settings</button>
+          <a class="btn btn-ghost" href="/dashboard">Cancel</a>
+        </div>
+      </form>
     </div>
 
-    <div style="margin-bottom: 1.5rem;">
-      <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">
-        Update Frequency
-      </label>
-      <select name="update_frequency" 
-              style="width: 100%; padding: 0.6rem; background: #1e293b; color: #e5e7eb; border: 1px solid #334155; border-radius: 8px; font-size: 1rem;">
-        <option value="daily" {% if settings.update_frequency == 'daily' %}selected{% endif %}>Daily</option>
-        <option value="weekly" {% if settings.update_frequency == 'weekly' %}selected{% endif %}>Weekly</option>
-        <option value="monthly" {% if settings.update_frequency == 'monthly' %}selected{% endif %}>Monthly</option>
-      </select>
-      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
-        Choose how often automatic updates should run. Daily updates provide the most security but may cause interruptions.
-        Weekly or monthly updates are better for stable production environments.
-      </p>
+    <!-- Update Controls -->
+    <div class="card">
+      <div class="card-header">
+        <h3>&#x1F3AE; Update Controls</h3>
+      </div>
+      <p>Manually trigger updates or navigate to host management.</p>
+      <div class="btn-group" style="margin-top:0.75rem;">
+        <a class="btn btn-primary" href="/dashboard">&#x1F504; Update Dashboard</a>
+        <a class="btn btn-success" href="/hosts">&#x1F5A7; Manage Hosts</a>
+      </div>
     </div>
-
-    <div style="margin-bottom: 1.5rem;">
-      <label style="display: flex; align-items: center; cursor: pointer;">
-        <input type="checkbox" name="notification_enabled" 
-               {% if settings.notification_enabled %}checked{% endif %}
-               style="margin-right: 0.5rem; width: 20px; height: 20px; cursor: pointer;">
-        <span style="font-weight: bold;">Enable Update Notifications</span>
-      </label>
-      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
-        Show notifications about update status and completion in the dashboard.
-      </p>
-    </div>
-
-    <div style="margin-bottom: 1.5rem;">
-      <label style="display: flex; align-items: center; cursor: pointer;">
-        <input type="checkbox" name="dashboard_update_notifications" 
-               {% if settings.dashboard_update_notifications %}checked{% endif %}
-               style="margin-right: 0.5rem; width: 20px; height: 20px; cursor: pointer;">
-        <span style="font-weight: bold;">Enable Dashboard Update Notifications</span>
-      </label>
-      <p style="margin: 0.5rem 0 0 0; color: #94a3b8; font-size: 0.9rem;">
-        Get notified when a new version of the Linux Management Dashboard itself is available. 
-        The system will check for updates daily and notify you about new releases or commits.
-      </p>
-    </div>
-
-    {% if settings.last_auto_update %}
-    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #1e293b; border-radius: 8px;">
-      <strong>Last Automatic Update:</strong> {{ settings.last_auto_update }}
-    </div>
-    {% endif %}
-
-    <button type="submit" class="btn" style="margin-right: 0.5rem;">Save Settings</button>
-    <a class="btn" href="/dashboard" style="background: #475569;">Cancel</a>
-  </form>
-</div>
-
-<div class="card">
-  <h3>Update Controls</h3>
-  <p>
-    Use these controls to manually trigger updates or configure update behavior for each host.
-  </p>
-  
-  <div style="margin-top: 1rem;">
-    <a class="btn" href="/dashboard" style="margin-right: 0.5rem;">View Update Dashboard</a>
-    <a class="btn" href="/hosts" style="background: #059669;">Manage Hosts</a>
   </div>
+
+  <!-- Right: Notes -->
+  <div>
+    <div class="card card-amber">
+      <h3 style="margin-bottom:0.75rem;">&#x1F4DD; Important Notes</h3>
+      <ul style="font-size:0.875rem; line-height:1.9;">
+        <li><strong>Roles:</strong> Automatic updates require <em>operator</em> or <em>admin</em> role.</li>
+        <li><strong>Repo Update:</strong> Updates packages while keeping configuration files unchanged.</li>
+        <li><strong>Full Update:</strong> Performs complete system updates including configuration files.</li>
+        <li><strong>Network:</strong> All hosts must be online and accessible via SSH.</li>
+        <li><strong>Security:</strong> Ensure SSH keys are configured for passwordless authentication.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:0.75rem;">&#x1F517; Quick Links</h3>
+      <div style="display:flex; flex-direction:column; gap:0.5rem;">
+        <a class="btn btn-ghost btn-sm" href="/dashboard">&#x1F504; Update Dashboard</a>
+        <a class="btn btn-ghost btn-sm" href="/hosts">&#x1F5A7; Manage Hosts</a>
+        <a class="btn btn-ghost btn-sm" href="/email_settings">&#x2709; Email Config</a>
+        <a class="btn btn-ghost btn-sm" href="/dashboard_version/check">&#x1F50D; Check Dashboard Version</a>
+      </div>
+    </div>
+  </div>
+
 </div>
 
-<div class="card">
-  <h3>Important Notes</h3>
-  <ul style="line-height: 1.8; color: #cbd5e1;">
-    <li><strong>Automatic updates require operator or admin role</strong> - Viewers cannot enable automatic updates</li>
-    <li><strong>Repository-only updates</strong> - Use the "Repo Update" button on the dashboard to update packages while keeping configuration files unchanged</li>
-    <li><strong>Full updates</strong> - Use the standard "Update" button to perform complete system updates including configuration files</li>
-    <li><strong>Network requirements</strong> - All configured hosts must be online and accessible via SSH for automatic updates to work</li>
-    <li><strong>Security</strong> - Ensure SSH keys are properly configured for passwordless authentication</li>
-  </ul>
-</div>
-</div>
+{% endblock %}

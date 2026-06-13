@@ -1,29 +1,49 @@
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="/static/style.css">
+{% extends "base.html" %}
 
-<div class="container">
-  <h2>Install SSH key on {{ name }}</h2>
-  <p><a class="btn" href="/hosts">Back to Hosts</a></p>
+{% block title %}Install SSH Key — Linux Management{% endblock %}
+{% block page_icon %}&#x1F511;{% endblock %}
+{% block page_title %}Install SSH Key: {{ name }}{% endblock %}
+
+{% block content %}
+
+<div style="max-width:560px;">
 
   {% if error %}
-    <div class="card">
-      <b>Error</b><br>
-      <pre>{{ error }}</pre>
+  <div class="card card-red">
+    <div class="card-header">
+      <h3>&#x274C; Installation Failed</h3>
     </div>
+    <pre>{{ error }}</pre>
+    <a class="btn btn-ghost btn-sm" href="/hosts" style="margin-top:0.75rem;">&#x2190; Back to Hosts</a>
+  </div>
+  {% elif success %}
+  <div class="card card-green">
+    <div class="card-header">
+      <h3>&#x2714; SSH Key Installed Successfully</h3>
+    </div>
+    <p>Public key installed into <code>~/.ssh/authorized_keys</code> on the remote host. Passwordless authentication is now available.</p>
+    <a class="btn btn-primary btn-sm" href="/hosts" style="margin-top:0.75rem;">&#x2190; Back to Hosts</a>
+  </div>
+  {% else %}
+  <div class="card">
+    <div class="card-header">
+      <h3>&#x1F511; Install SSH Key on {{ name }}</h3>
+    </div>
+    <p>Enter the SSH password for the remote host to install the public key for passwordless authentication.</p>
+    <form method="post">
+      <div class="form-group">
+        <label class="form-label">Remote Account Password for <strong>{{ name }}</strong></label>
+        <input class="form-control" type="password" name="password" placeholder="SSH password" autofocus>
+        <p class="form-hint">Used once to copy the SSH key. Not stored anywhere.</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" type="submit">&#x1F511; Install Key</button>
+        <a class="btn btn-ghost" href="/hosts">&#x2190; Cancel</a>
+      </div>
+    </form>
+  </div>
   {% endif %}
 
-  {% if success %}
-    <div class="card">
-      <b>Success</b><br>
-      Public key installed into ~/.ssh/authorized_keys on the remote host.
-    </div>
-  {% else %}
-    <div class="card">
-      <form method="post">
-        <label>Remote account password for {{ name }}</label><br>
-        <input name="password" type="password" placeholder="Password"><br><br>
-        <button class="btn" type="submit">Install Key</button>
-      </form>
-    </div>
-  {% endif %}
 </div>
+
+{% endblock %}

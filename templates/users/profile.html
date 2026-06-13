@@ -1,35 +1,60 @@
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="/static/style.css">
+{% extends "base.html" %}
 
-<div class="container">
-  <h2>My Profile</h2>
-  <p><a class="btn" href="/index">Back to Main Menu</a></p>
+{% block title %}My Profile — Linux Management{% endblock %}
+{% block page_icon %}&#x1F464;{% endblock %}
+{% block page_title %}My Profile{% endblock %}
 
-  {% with messages = get_flashed_messages() %}
-    {% if messages %}
-      {% for message in messages %}
-        <div class="alert">{{ message }}</div>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
+{% block content %}
 
+<div style="display:grid; grid-template-columns:1fr 1.5fr; gap:1.5rem; max-width:860px;">
+
+  <!-- Account Info -->
   <div class="card">
-    <h3>Account Information</h3>
-    <b>Username:</b> {{ user.username }}<br>
-    <b>Email:</b> {{ user.email or 'Not set' }}<br>
-    <b>Roles:</b> {{ user_roles|join(', ') }}<br>
-    <b>Account created:</b> {{ user.created_at }}<br>
+    <div class="card-header">
+      <h3>&#x1F464; Account Information</h3>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.9rem;">
+      <div>
+        <div class="text-muted" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em;">Username</div>
+        <div style="font-weight:600; color:var(--text-primary); margin-top:0.2rem;">{{ user.username }}</div>
+      </div>
+      <div>
+        <div class="text-muted" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em;">Email</div>
+        <div style="font-weight:500; color:var(--text-secondary); margin-top:0.2rem;">{{ user.email or 'Not set' }}</div>
+      </div>
+      <div>
+        <div class="text-muted" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em;">Roles</div>
+        <div style="margin-top:0.35rem; display:flex; flex-wrap:wrap; gap:0.35rem;">
+          {% for role in user_roles %}
+          <span class="badge badge-blue">{{ role }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      <div>
+        <div class="text-muted" style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em;">Member Since</div>
+        <div style="font-weight:500; color:var(--text-secondary); margin-top:0.2rem;">{{ user.created_at }}</div>
+      </div>
+    </div>
   </div>
 
-  <form method="post" class="card">
-    <h3>Update Profile</h3>
-    
-    <label>Email</label><br>
-    <input name="email" type="email" value="{{ user.email or '' }}" placeholder="user@example.com"><br><br>
-    
-    <label>New Password (leave blank to keep current)</label><br>
-    <input name="password" type="password" placeholder="new password"><br><br>
-    
-    <button class="btn" type="submit">Update Profile</button>
-  </form>
+  <!-- Update Profile -->
+  <div class="card">
+    <div class="card-header">
+      <h3>&#x270F; Update Profile</h3>
+    </div>
+    <form method="post">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-control" type="email" name="email" value="{{ user.email or '' }}" placeholder="user@example.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">New Password <span class="text-muted">(leave blank to keep current)</span></label>
+        <input class="form-control" type="password" name="password" placeholder="new password">
+      </div>
+      <button class="btn btn-primary" type="submit">&#x1F4BE; Update Profile</button>
+    </form>
+  </div>
+
 </div>
+
+{% endblock %}

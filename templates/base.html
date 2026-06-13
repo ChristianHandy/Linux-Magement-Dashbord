@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Linux Management Dashboard{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  {% block head %}{% endblock %}
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">&#x1F5A5;</div>
+      <div class="sidebar-brand-text">
+        <span class="sidebar-brand-title">Linux Mgmt</span>
+        <span class="sidebar-brand-sub">Dashboard</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="sidebar-section-label">Overview</span>
+      <a class="sidebar-link {% if request.path == '/index' or request.path == '/' %}active{% endif %}" href="/index">
+        <span class="sidebar-icon">&#x1F3E0;</span> Home
+      </a>
+
+      <span class="sidebar-section-label">Management</span>
+      <a class="sidebar-link {% if request.path.startswith('/dashboard') %}active{% endif %}" href="/dashboard">
+        <span class="sidebar-icon">&#x1F504;</span> Update Dashboard
+      </a>
+      <a class="sidebar-link {% if request.path.startswith('/hosts') %}active{% endif %}" href="/hosts">
+        <span class="sidebar-icon">&#x1F5A7;</span> Manage Hosts
+      </a>
+      <a class="sidebar-link {% if request.path.startswith('/disks') %}active{% endif %}" href="/disks">
+        <span class="sidebar-icon">&#x1F4BE;</span> Disk Tools
+      </a>
+
+      <span class="sidebar-section-label">Settings</span>
+      <a class="sidebar-link {% if request.path.startswith('/update_settings') %}active{% endif %}" href="/update_settings">
+        <span class="sidebar-icon">&#x2699;&#xFE0F;</span> Update Settings
+      </a>
+      <a class="sidebar-link {% if request.path.startswith('/email_settings') %}active{% endif %}" href="/email_settings">
+        <span class="sidebar-icon">&#x2709;&#xFE0F;</span> Email Config
+      </a>
+
+      <span class="sidebar-section-label">Account</span>
+      <a class="sidebar-link {% if request.path.startswith('/users/profile') %}active{% endif %}" href="/users/profile">
+        <span class="sidebar-icon">&#x1F464;</span> My Profile
+      </a>
+      {% if is_admin is defined and is_admin %}
+      <a class="sidebar-link {% if request.path.startswith('/users') and not request.path.startswith('/users/profile') %}active{% endif %}" href="/users">
+        <span class="sidebar-icon">&#x1F465;</span> User Management
+      </a>
+      {% endif %}
+    </nav>
+
+    <div class="sidebar-footer">
+      <a class="sidebar-link" href="/logout">
+        <span class="sidebar-icon">&#x1F6AA;</span> Logout
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-title">
+        <span>{% block page_icon %}&#x1F4CA;{% endblock %}</span>
+        {% block page_title %}Dashboard{% endblock %}
+      </div>
+      <div class="topbar-actions">
+        {% block topbar_actions %}{% endblock %}
+        <a class="btn btn-ghost btn-sm" href="/users/profile">&#x1F464; Profile</a>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <main class="page-content">
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          {% for message in messages %}
+            <div class="alert">&#x2714; {{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<script>
+  // Mobile sidebar toggle
+  document.addEventListener('DOMContentLoaded', function() {
+    const sidebar = document.getElementById('sidebar');
+    const toggle = document.getElementById('sidebar-toggle');
+    if (toggle && sidebar) {
+      toggle.addEventListener('click', function() {
+        sidebar.classList.toggle('open');
+      });
+    }
+  });
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

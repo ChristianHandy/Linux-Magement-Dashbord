@@ -1,36 +1,51 @@
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="/static/style.css">
+{% extends "base.html" %}
 
-<div class="container">
-  <h2>Add New User</h2>
-  <p><a class="btn" href="/users">Back to User List</a></p>
+{% block title %}Add User — Linux Management{% endblock %}
+{% block page_icon %}&#x2795;{% endblock %}
+{% block page_title %}Add New User{% endblock %}
 
-  {% with messages = get_flashed_messages() %}
-    {% if messages %}
-      {% for message in messages %}
-        <div class="alert">{{ message }}</div>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
+{% block content %}
 
-  <form method="post" class="card">
-    <label>Username *</label><br>
-    <input name="username" placeholder="username" required><br><br>
-    
-    <label>Password *</label><br>
-    <input name="password" type="password" placeholder="password" required><br><br>
-    
-    <label>Email</label><br>
-    <input name="email" type="email" placeholder="user@example.com"><br><br>
-    
-    <label>Roles *</label><br>
-    {% for role in all_roles %}
-      <input type="checkbox" name="roles" value="{{ role.name }}" id="role_{{ role.id }}"
-        {% if role.name == 'viewer' %}checked{% endif %}>
-      <label for="role_{{ role.id }}">{{ role.name }} - {{ role.description }}</label><br>
-    {% endfor %}
-    <br>
-    
-    <button class="btn" type="submit">Create User</button>
-  </form>
+<div style="max-width:560px;">
+  <div class="card">
+    <div class="card-header">
+      <h3>&#x2795; Create New User</h3>
+    </div>
+    <form method="post">
+      <div class="form-group">
+        <label class="form-label">Username <span class="text-red">*</span></label>
+        <input class="form-control" name="username" placeholder="username" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password <span class="text-red">*</span></label>
+        <input class="form-control" type="password" name="password" placeholder="password" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email <span class="text-muted">(optional)</span></label>
+        <input class="form-control" type="email" name="email" placeholder="user@example.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Roles <span class="text-red">*</span></label>
+        <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:0.5rem;">
+          {% for role in all_roles %}
+          <label style="display:flex; align-items:center; gap:0.65rem; padding:0.6rem 0.85rem; background:var(--bg-elevated); border:1px solid var(--border); border-radius:var(--radius-md); cursor:pointer; transition:all 0.2s;">
+            <input type="checkbox" name="roles" value="{{ role.name }}" id="role_{{ role.id }}"
+              {% if role.name == 'viewer' %}checked{% endif %}
+              style="width:16px; height:16px; accent-color:var(--accent-blue);">
+            <span>
+              <strong style="color:var(--text-primary);">{{ role.name }}</strong>
+              <span class="text-muted"> — {{ role.description }}</span>
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" type="submit">&#x1F4BE; Create User</button>
+        <a class="btn btn-ghost" href="/users">&#x2190; Cancel</a>
+      </div>
+    </form>
+  </div>
 </div>
+
+{% endblock %}
