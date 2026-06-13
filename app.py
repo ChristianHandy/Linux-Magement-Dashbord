@@ -1,4 +1,5 @@
 from flask import Flask, render_template, redirect, session, request, flash, jsonify, send_file, url_for
+from i18n import get_translator, SUPPORTED_LANGUAGES
 import json, threading, paramiko, os, secrets
 from updater import run_update
 import scheduler
@@ -58,6 +59,20 @@ def inject_user_context():
         current_user_roles=user_roles,
         is_admin=is_admin,
         localhost_identifiers=LOCALHOST_IDENTIFIERS
+    )
+
+# Template function for theme and language context
+@app.context_processor
+def inject_ui_context():
+    """Inject current theme and language into all templates."""
+    lang = session.get('lang', 'en')
+    theme = session.get('theme', 'dark')
+    translator = get_translator(lang)
+    return dict(
+        current_lang=lang,
+        current_theme=theme,
+        _=translator,
+        supported_languages=SUPPORTED_LANGUAGES
     )
 
 # Template function for version update notifications
@@ -415,6 +430,23 @@ def manage_hosts():
             host_data = {"host": host, "user": user}
             if mac:
                 host_data["mac"] = mac
+            # Multiboot: parse OS profiles from form (issue #36)
+            os_names    = request.form.getlist("os_name")
+            os_types    = request.form.getlist("os_type")
+            os_defaults = request.form.getlist("os_default")
+            os_profiles = []
+            for i, oname in enumerate(os_names):
+                oname = oname.strip()
+                if not oname:
+                    continue
+                otype = os_types[i].strip() if i < len(os_types) else "linux"
+                is_default = str(i) in os_defaults or oname in os_defaults
+                os_profiles.append({"name": oname, "type": otype, "default": is_default})
+            if os_profiles:
+                # Ensure exactly one default
+                if not any(p["default"] for p in os_profiles):
+                    os_profiles[0]["default"] = True
+                host_data["os_profiles"] = os_profiles
             hosts[name] = host_data
             save_hosts(hosts)
         return redirect("/hosts")
@@ -444,6 +476,22 @@ def edit_host(orig_name):
             host_data = {"host": host, "user": user}
             if mac:
                 host_data["mac"] = mac
+            # Multiboot: parse OS profiles from form (issue #36)
+            os_names    = request.form.getlist("os_name")
+            os_types    = request.form.getlist("os_type")
+            os_defaults = request.form.getlist("os_default")
+            os_profiles = []
+            for i, oname in enumerate(os_names):
+                oname = oname.strip()
+                if not oname:
+                    continue
+                otype = os_types[i].strip() if i < len(os_types) else "linux"
+                is_default = str(i) in os_defaults or oname in os_defaults
+                os_profiles.append({"name": oname, "type": otype, "default": is_default})
+            if os_profiles:
+                if not any(p["default"] for p in os_profiles):
+                    os_profiles[0]["default"] = True
+                host_data["os_profiles"] = os_profiles
             hosts[new_name] = host_data
             save_hosts(hosts)
         return redirect("/hosts")
@@ -1019,6 +1067,26 @@ def add_security_headers(response):
     if request.is_secure:
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     return response
+
+# ---- UI Preference Routes ----
+
+@app.route("/set_theme", methods=["POST", "GET"])
+def set_theme():
+    """Persist the user's chosen theme (light/dark) in the session."""
+    theme = request.args.get('theme') or request.form.get('theme', 'dark')
+    if theme in ('light', 'dark'):
+        session['theme'] = theme
+    return ('', 204)
+
+@app.route("/set_language", methods=["POST", "GET"])
+def set_language():
+    """Persist the user's chosen language in the session."""
+    from i18n import SUPPORTED_LANGUAGES
+    lang = request.args.get('lang') or request.form.get('lang', 'en')
+    if lang in SUPPORTED_LANGUAGES:
+        session['lang'] = lang
+    next_url = request.form.get('next') or request.args.get('next') or '/index'
+    return redirect(next_url)
 
 if __name__ == "__main__":
     # Initialize User Management database

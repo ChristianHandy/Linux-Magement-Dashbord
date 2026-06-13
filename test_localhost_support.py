@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for localhost support in the Linux Management Dashboard.
+Test script for localhost support in the FleetPilot.
 This verifies that localhost detection and handling works correctly.
 """
 
@@ -54,7 +54,7 @@ def test_imports():
 def main():
     """Run all tests"""
     print("=" * 60)
-    print("Testing localhost support for Linux Management Dashboard")
+    print("Testing localhost support for FleetPilot")
     print("=" * 60 + "\n")
     
     all_passed = True

@@ -1,69 +1,100 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ current_lang|default('en') }}" data-theme="{{ current_theme|default('dark') }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login — Linux Management Dashboard</title>
+  <title>{{ _('Login') }} — FleetPilot</title>
   <link rel="stylesheet" href="/static/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    (function() {
+      const saved = localStorage.getItem('fp_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', saved);
+    })();
+  </script>
 </head>
 <body>
-<div class="login-wrapper">
-  <div class="login-card">
 
-    <div class="login-logo">
-      <div class="login-logo-icon">&#x1F5A5;</div>
-    </div>
-
-    <h1 class="login-title">Linux Management</h1>
-    <p class="login-subtitle">Sign in to your dashboard</p>
-
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        {% for message in messages %}
-          <div class="alert alert-danger" style="margin-bottom:1rem;">&#x26A0; {{ message }}</div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
-
-    <form action="/" method="post">
-      <div class="form-group">
-        <label class="form-label" for="username">Username</label>
-        <input
-          class="form-control"
-          type="text"
-          id="username"
-          name="user"
-          placeholder="Enter your username"
-          required
-          autocomplete="username"
-        >
-      </div>
-
-      <div class="form-group">
-        <label class="form-label" for="password">Password</label>
-        <input
-          class="form-control"
-          type="password"
-          id="password"
-          name="pass"
-          placeholder="Enter your password"
-          required
-          autocomplete="current-password"
-        >
-      </div>
-
-      <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:0.7rem; font-size:0.95rem; margin-top:0.5rem;">
-        &#x1F511; Sign In
-      </button>
-    </form>
-
-    <div class="divider"></div>
-    <p style="text-align:center; font-size:0.8rem; color:var(--text-muted);">
-      Linux Management Dashboard &mdash; Secure Access
-    </p>
+  <!-- Theme toggle (top-right corner) -->
+  <div class="login-theme-btn">
+    <button class="theme-toggle" id="theme-toggle" title="{{ _('Toggle theme') }}" type="button">
+      <span class="theme-icon-light">&#x2600;&#xFE0F;</span>
+      <span class="theme-icon-dark">&#x1F319;</span>
+    </button>
   </div>
-</div>
+
+  <div class="login-wrapper">
+    <div class="login-card">
+
+      <div class="login-logo">
+        <div class="login-logo-icon">&#x1F6E9;</div>
+      </div>
+
+      <h1 class="login-title">FleetPilot</h1>
+      <p class="login-subtitle">{{ _('Remote Fleet Management') }}</p>
+
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          {% for message in messages %}
+            <div class="alert alert-danger" style="margin-bottom:1rem;">&#x26A0; {{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form action="/" method="post">
+        <div class="form-group">
+          <label class="form-label" for="username">{{ _('Username') }}</label>
+          <input
+            class="form-control"
+            type="text"
+            id="username"
+            name="user"
+            placeholder="{{ _('Enter your username') }}"
+            required
+            autocomplete="username"
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">{{ _('Password') }}</label>
+          <input
+            class="form-control"
+            type="password"
+            id="password"
+            name="pass"
+            placeholder="{{ _('Enter your password') }}"
+            required
+            autocomplete="current-password"
+          >
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:0.7rem; font-size:0.95rem; margin-top:0.5rem;">
+          &#x1F511; {{ _('Sign In') }}
+        </button>
+      </form>
+
+      <div class="divider"></div>
+      <p style="text-align:center; font-size:0.8rem; color:var(--text-muted);">
+        FleetPilot &mdash; {{ _('Secure Fleet Access') }}
+      </p>
+    </div>
+  </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const btn = document.getElementById('theme-toggle');
+    if (btn) {
+      btn.addEventListener('click', function() {
+        const html = document.documentElement;
+        const current = html.getAttribute('data-theme') || 'dark';
+        const next = current === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('fp_theme', next);
+        fetch('/set_theme?theme=' + next, {method:'POST'}).catch(()=>{});
+      });
+    }
+  });
+</script>
 </body>
 </html>

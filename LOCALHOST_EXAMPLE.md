@@ -1,6 +1,6 @@
 # Localhost Support - Quick Start Example
 
-This example shows how to add localhost to your Linux Management Dashboard.
+This example shows how to add localhost to your FleetPilot.
 
 ## Method 1: Via Web UI (Recommended)
 

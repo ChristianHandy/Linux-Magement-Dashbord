@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for Windows support in the Linux Management Dashboard.
+Test script for Windows support in the FleetPilot.
 This verifies that Windows detection and update command generation works correctly.
 """
 
@@ -130,7 +130,7 @@ def test_imports():
 def main():
     """Run all tests"""
     print("=" * 70)
-    print("Testing Windows support for Linux Management Dashboard")
+    print("Testing Windows support for FleetPilot")
     print("=" * 70 + "\n")
     
     all_passed = True

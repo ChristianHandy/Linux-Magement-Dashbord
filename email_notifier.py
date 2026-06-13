@@ -1,5 +1,5 @@
 """
-Email notification system for the Linux Management Dashboard.
+Email notification system for the FleetPilot.
 Sends scheduled reports and error notifications via SMTP.
 """
 import smtplib
@@ -95,10 +95,10 @@ def send_update_report(hosts_status, history):
         return False, "Scheduled reports are disabled"
     
     # Generate report content
-    subject = f"Linux Management Dashboard - System Report ({datetime.now().strftime('%Y-%m-%d')})"
+    subject = f"FleetPilot - System Report ({datetime.now().strftime('%Y-%m-%d')})"
     
     # Plain text body
-    body = f"""Linux Management Dashboard - System Status Report
+    body = f"""FleetPilot - System Status Report
 Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 === HOST STATUS ===
@@ -124,13 +124,13 @@ Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
     
     body += """
 ---
-This is an automated report from Linux Management Dashboard
+This is an automated report from FleetPilot
 """
     
     # HTML body
     html_body = f"""<html>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-    <h2 style="color: #2c3e50;">Linux Management Dashboard - System Status Report</h2>
+    <h2 style="color: #2c3e50;">FleetPilot - System Status Report</h2>
     <p style="color: #7f8c8d;">Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
     
     <h3 style="color: #34495e; margin-top: 30px;">Host Status</h3>
@@ -177,7 +177,7 @@ This is an automated report from Linux Management Dashboard
     
     html_body += """
     <hr style="margin-top: 30px; border: none; border-top: 1px solid #ddd;">
-    <p style="color: #7f8c8d; font-size: 0.9em;">This is an automated report from Linux Management Dashboard</p>
+    <p style="color: #7f8c8d; font-size: 0.9em;">This is an automated report from FleetPilot</p>
 </body>
 </html>
 """
@@ -198,7 +198,7 @@ def send_error_notification(hostname, error_message):
     if not email_config.get_error_notifications_enabled():
         return False, "Error notifications are disabled"
     
-    subject = f"⚠️ Linux Management Dashboard - Update Error: {hostname}"
+    subject = f"⚠️ FleetPilot - Update Error: {hostname}"
     
     # Plain text body
     body = f"""ALERT: System Update Error
@@ -212,7 +212,7 @@ Error Details:
 Please check the dashboard for more information and take appropriate action.
 
 ---
-This is an automated alert from Linux Management Dashboard
+This is an automated alert from FleetPilot
 """
     
     # HTML body
@@ -235,7 +235,7 @@ This is an automated alert from Linux Management Dashboard
     <p style="margin-top: 30px;">Please check the dashboard for more information and take appropriate action.</p>
     
     <hr style="margin-top: 30px; border: none; border-top: 1px solid #ddd;">
-    <p style="color: #7f8c8d; font-size: 0.9em;">This is an automated alert from Linux Management Dashboard</p>
+    <p style="color: #7f8c8d; font-size: 0.9em;">This is an automated alert from FleetPilot</p>
 </body>
 </html>
 """
@@ -249,15 +249,15 @@ def test_email_configuration():
     Returns:
         tuple: (success: bool, error_message: str or None)
     """
-    subject = "Linux Management Dashboard - Test Email"
-    body = f"""This is a test email from Linux Management Dashboard.
+    subject = "FleetPilot - Test Email"
+    body = f"""This is a test email from FleetPilot.
 
 If you received this email, your email configuration is working correctly.
 
 Test sent at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 ---
-Linux Management Dashboard
+FleetPilot
 """
     
     html_body = f"""<html>
@@ -266,7 +266,7 @@ Linux Management Dashboard
         <h2 style="margin: 0;">✓ Email Configuration Test</h2>
     </div>
     
-    <p style="margin-top: 20px;">This is a test email from Linux Management Dashboard.</p>
+    <p style="margin-top: 20px;">This is a test email from FleetPilot.</p>
     
     <div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin-top: 20px;">
         <p style="margin: 0;"><strong>Success!</strong> If you received this email, your email configuration is working correctly.</p>
@@ -275,7 +275,7 @@ Linux Management Dashboard
     <p style="margin-top: 20px; color: #7f8c8d;">Test sent at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
     
     <hr style="margin-top: 30px; border: none; border-top: 1px solid #ddd;">
-    <p style="color: #7f8c8d; font-size: 0.9em;">Linux Management Dashboard</p>
+    <p style="color: #7f8c8d; font-size: 0.9em;">FleetPilot</p>
 </body>
 </html>
 """

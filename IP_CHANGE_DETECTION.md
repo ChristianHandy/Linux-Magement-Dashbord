@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Linux Management Dashboard now includes automatic IP address change detection for hosts in DHCP environments. This feature uses ARP (Address Resolution Protocol) tables and MAC addresses to track and automatically update host IP addresses when they change.
+The FleetPilot now includes automatic IP address change detection for hosts in DHCP environments. This feature uses ARP (Address Resolution Protocol) tables and MAC addresses to track and automatically update host IP addresses when they change.
 
 ## Features
 

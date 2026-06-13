@@ -1,7 +1,7 @@
-# Feature Implementation: Localhost Support for Linux Management Dashboard
+# Feature Implementation: Localhost Support for FleetPilot
 
 ## Overview
-This implementation adds support for managing the local server (localhost) where the Linux Management Dashboard is running, without requiring SSH configuration.
+This implementation adds support for managing the local server (localhost) where the FleetPilot is running, without requiring SSH configuration.
 
 ## Problem Statement
 The original issue requested: "Add support for local server running the linux manegment"
@@ -207,6 +207,6 @@ Potential future improvements:
 
 ## Conclusion
 
-This implementation successfully adds localhost support to the Linux Management Dashboard, providing users with a convenient way to manage the server running the dashboard without requiring SSH configuration. The code is well-tested, secure, documented, and maintains backward compatibility with existing functionality.
+This implementation successfully adds localhost support to the FleetPilot, providing users with a convenient way to manage the server running the dashboard without requiring SSH configuration. The code is well-tested, secure, documented, and maintains backward compatibility with existing functionality.
 
 **Status**: ✅ Complete and ready for production use (pending manual testing)

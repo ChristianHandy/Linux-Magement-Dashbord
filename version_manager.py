@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 VERSION_CHECK_FILE = "version_check.json"
-GITHUB_REPO = "ChristianHandy/Linux-Magement-Dashbord"
+GITHUB_REPO = "ChristianHandy/fleetpilot"
 GITHUB_API_BASE = "https://api.github.com"
 
 def load_version_data():

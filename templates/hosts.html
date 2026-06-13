@@ -1,23 +1,28 @@
 {% extends "base.html" %}
 
-{% block title %}Manage Hosts — Linux Management{% endblock %}
+{% block title %}{{ _('Manage Hosts') }} — FleetPilot{% endblock %}
 {% block page_icon %}&#x1F5A7;{% endblock %}
-{% block page_title %}Manage Hosts{% endblock %}
+{% block page_title %}{{ _('Manage Hosts') }}{% endblock %}
 
 {% block topbar_actions %}
-<a class="btn btn-secondary btn-sm" href="/dashboard">&#x1F504; Dashboard</a>
+<a class="btn btn-secondary btn-sm" href="/dashboard">&#x1F504; {{ _('Dashboard') }}</a>
 {% if not current_user_id or 'operator' in current_user_roles or 'admin' in current_user_roles %}
-<a class="btn btn-secondary btn-sm" href="/hosts/arp_table">&#x1F4CB; ARP Table</a>
-<a class="btn btn-primary btn-sm" href="/hosts/scan_ip_changes">&#x1F50D; Scan IPs</a>
+<a class="btn btn-secondary btn-sm" href="/hosts/arp_table">&#x1F4CB; ARP</a>
+<a class="btn btn-secondary btn-sm" href="/hosts/scan_ip_changes">&#x1F50D; {{ _('Scan IPs') }}</a>
+<a class="btn btn-primary btn-sm" href="#add-host-form">&#x2B; {{ _('Add Host') }}</a>
 {% endif %}
 {% endblock %}
 
 {% block content %}
+<div class="page-header">
+  <h2>&#x1F5A7; {{ _('Manage Hosts') }}</h2>
+  <p>{{ _('Configure remote and local machines for fleet management.') }}</p>
+</div>
 
 <!-- Existing Hosts -->
-<div class="card-header" style="margin-bottom:1rem; padding:0;">
-  <h3>&#x1F5A7; Existing Hosts</h3>
-  <span class="badge badge-blue">{{ hosts|length if hosts else 0 }} hosts</span>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+  <h3 style="font-size:1rem;font-weight:600;color:var(--text-secondary);">{{ _('Configured Hosts') }}</h3>
+  <span class="badge badge-blue">{{ hosts|length if hosts else 0 }} {{ _('hosts') }}</span>
 </div>
 
 {% if hosts %}
@@ -29,7 +34,7 @@
         <div class="host-card-name">
           {{ name }}
           {% if h.host.lower() in localhost_identifiers %}
-            <span class="badge-local" style="margin-left:0.5rem;">LOCAL</span>
+            <span class="badge-local" style="margin-left:0.5rem;">&#x1F3E0; {{ _('Local') }}</span>
           {% endif %}
         </div>
         <div class="host-card-meta">
@@ -42,19 +47,41 @@
       </div>
     </div>
 
+    <!-- OS Profiles (Multiboot — Issue #36) -->
+    {% if h.os_profiles %}
+    <div class="os-profile-list">
+      <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.3rem;">
+        &#x1F4BF; {{ _('OS Profiles') }}
+      </div>
+      {% for profile in h.os_profiles %}
+      <div class="os-profile-item {% if profile.default %}default-os{% endif %}">
+        <span>{% if profile.type == 'windows' %}&#x1FA9F;{% else %}&#x1F427;{% endif %}</span>
+        <span class="os-name">{{ profile.name }}</span>
+        <span class="os-type">({{ profile.type }})</span>
+        {% if profile.default %}
+          <span class="badge badge-blue" style="margin-left:auto;">{{ _('Default') }}</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     {% if not current_user_id or 'operator' in current_user_roles or 'admin' in current_user_roles %}
     <div class="host-card-actions">
-      <a class="btn btn-secondary btn-sm" href="/hosts/edit/{{ name }}">&#x270F; Edit</a>
+      <a class="btn btn-secondary btn-sm" href="/hosts/edit/{{ name }}">&#x270F; {{ _('Edit') }}</a>
       {% if h.host.lower() not in localhost_identifiers %}
-        <a class="btn btn-primary btn-sm" href="/hosts/install_key/{{ name }}">&#x1F511; SSH Key</a>
+        <a class="btn btn-primary btn-sm" href="/hosts/install_key/{{ name }}">&#x1F511; SSH {{ _('Key') }}</a>
         {% if not h.mac %}
-        <a class="btn btn-ghost btn-sm" href="/hosts/detect_mac/{{ name }}">&#x1F50D; Detect MAC</a>
+        <a class="btn btn-ghost btn-sm" href="/hosts/detect_mac/{{ name }}">&#x1F50D; MAC</a>
         {% endif %}
       {% else %}
-        <span class="text-muted" style="font-size:0.78rem;">No SSH key needed</span>
+        <span class="text-muted" style="font-size:0.78rem;">{{ _('No SSH key needed') }}</span>
       {% endif %}
       <form action="/hosts/delete/{{ name }}" method="post" style="display:inline; margin:0;">
-        <button class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Delete host \'{{ name }}\'?')">&#x1F5D1; Delete</button>
+        <button class="btn btn-danger btn-sm" type="submit"
+          onclick="return confirm('{{ _('Delete host') }} \'{{ name }}\'?')">
+          &#x1F5D1; {{ _('Delete') }}
+        </button>
       </form>
     </div>
     {% endif %}
@@ -64,50 +91,119 @@
 {% else %}
 <div class="empty-state">
   <div class="empty-state-icon">&#x1F5A7;</div>
-  <h3>No hosts configured</h3>
-  <p>Add your first host below to start managing remote Linux systems.</p>
+  <h3>{{ _('No hosts configured yet.') }}</h3>
+  <p>{{ _('Add your first host below to start managing remote systems.') }}</p>
 </div>
 {% endif %}
 
 <!-- Add Host Form -->
 {% if not current_user_id or 'operator' in current_user_roles or 'admin' in current_user_roles %}
-<div style="margin-top:2rem;">
-  <div class="card-header" style="margin-bottom:1rem; padding:0;">
-    <h3>&#x2795; Add / Update Host</h3>
-  </div>
-
+<div style="margin-top:2rem;" id="add-host-form">
   <div class="info-box">
-    <p><strong>&#x1F4A1; Tip:</strong> Use <code>localhost</code> as the host to manage this local server directly — no SSH key required.</p>
-    <p><strong>Example:</strong> Display name: <em>Local Server</em>, Host: <em>localhost</em>, User: <em>(any value)</em></p>
-    <p><strong>&#x1F195; IP Change Detection:</strong> Add a MAC address to enable automatic IP detection for DHCP hosts. Use the "Detect MAC" button or enter it manually.</p>
+    <p><strong>&#x1F4A1; {{ _('Tip') }}:</strong> {{ _('Use') }} <code>localhost</code> {{ _('as the host to manage this local server directly — no SSH key required.') }}</p>
+    <p><strong>&#x1F195; {{ _('IP Change Detection') }}:</strong> {{ _('Add a MAC address to enable automatic IP detection for DHCP hosts.') }}</p>
+    <p><strong>&#x1F4BF; {{ _('Multiboot') }}:</strong> {{ _('Add OS profiles for machines with multiple operating systems installed.') }}</p>
   </div>
 
   <div class="card">
-    <form method="post">
-      <div class="form-group">
-        <label class="form-label">Display Name</label>
-        <input class="form-control" name="name" placeholder="e.g. Web Server, NAS, Workstation">
+    <div class="card-header">
+      <h3>&#x2B; {{ _('Add Host') }}</h3>
+    </div>
+    <form method="post" id="add-host-form-inner">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">{{ _('Display Name') }} <span style="color:var(--accent-red)">*</span></label>
+          <input class="form-control" name="name" placeholder="{{ _('e.g. Web Server') }}" required>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">{{ _('IP Address / Hostname') }} <span style="color:var(--accent-red)">*</span></label>
+          <input class="form-control" name="host" placeholder="192.168.1.100 / localhost" required>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">{{ _('SSH User') }} <span style="color:var(--accent-red)">*</span></label>
+          <input class="form-control" name="user" placeholder="{{ _('e.g. admin') }}" required>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">{{ _('MAC Address') }} <span style="color:var(--text-muted);font-weight:400;">({{ _('optional') }})</span></label>
+          <input class="form-control" name="mac" placeholder="AA:BB:CC:DD:EE:FF">
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Host (IP or Hostname)</label>
-        <input class="form-control" name="host" placeholder="192.168.1.100 or localhost">
+
+      <!-- OS Profiles (Multiboot) — Issue #36 -->
+      <div style="margin-top:0.5rem;padding-top:1rem;border-top:1px solid var(--border);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+          <label class="form-label" style="margin-bottom:0;">
+            &#x1F4BF; {{ _('OS Profiles (Multiboot)') }}
+            <span style="color:var(--text-muted);font-weight:400;font-size:0.8rem;"> — {{ _('optional') }}</span>
+          </label>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="addOsProfile()">&#x2B; {{ _('Add OS Profile') }}</button>
+        </div>
+        <div id="os-profiles-container"></div>
+        <p class="form-hint">{{ _('For dual-boot or multi-OS machines, define each installed OS. The default OS will be used for updates.') }}</p>
       </div>
-      <div class="form-group">
-        <label class="form-label">SSH User</label>
-        <input class="form-control" name="user" placeholder="username (ignored for localhost)">
+
+      <div style="margin-top:1rem;">
+        <button class="btn btn-primary" type="submit">&#x1F4BE; {{ _('Save Host') }}</button>
       </div>
-      <div class="form-group">
-        <label class="form-label">MAC Address <span class="text-muted">(optional, for IP change detection)</span></label>
-        <input class="form-control" name="mac" placeholder="00:11:22:33:44:55">
-      </div>
-      <button class="btn btn-primary" type="submit">&#x1F4BE; Save Host</button>
     </form>
   </div>
 </div>
 {% else %}
 <div class="alert alert-warning" style="margin-top:1.5rem;">
-  &#x26A0; You need <strong>operator</strong> or <strong>admin</strong> role to manage hosts.
+  &#x26A0; {{ _('You need') }} <strong>operator</strong> {{ _('or') }} <strong>admin</strong> {{ _('role to manage hosts.') }}
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let osProfileCount = 0;
+
+  const OS_TYPES = [
+    {value: 'ubuntu',  label: 'Ubuntu / Debian'},
+    {value: 'fedora',  label: 'Fedora'},
+    {value: 'centos',  label: 'CentOS / RHEL'},
+    {value: 'arch',    label: 'Arch Linux'},
+    {value: 'windows', label: 'Windows'},
+    {value: 'other',   label: '{{ _("Other") }}'},
+  ];
+
+  function addOsProfile(name='', type='ubuntu', isDefault=false) {
+    const idx = osProfileCount++;
+    const container = document.getElementById('os-profiles-container');
+    const div = document.createElement('div');
+    div.id = 'os-profile-' + idx;
+    div.style.cssText = 'display:grid;grid-template-columns:1fr 180px 130px 36px;gap:0.5rem;align-items:center;margin-bottom:0.5rem;';
+
+    const typeOptions = OS_TYPES.map(t =>
+      `<option value="${t.value}" ${type===t.value?'selected':''}>${t.label}</option>`
+    ).join('');
+
+    div.innerHTML = `
+      <input class="form-control" type="text" name="os_name"
+             placeholder="{{ _('OS Name') }} (e.g. Ubuntu 24.04)" value="${escapeHtml(name)}">
+      <select class="form-control" name="os_type">${typeOptions}</select>
+      <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.85rem;color:var(--text-secondary);
+                    cursor:pointer;padding:0.45rem 0.6rem;border:1px solid var(--border);
+                    border-radius:var(--radius-md);background:var(--bg-elevated);">
+        <input type="checkbox" name="os_default" value="${idx}" ${isDefault?'checked':''}
+               style="width:16px;height:16px;accent-color:var(--accent-blue);">
+        {{ _('Default') }}
+      </label>
+      <button type="button" onclick="removeOsProfile(${idx})"
+              class="btn btn-danger btn-sm" style="padding:0.4rem 0.6rem;">&#x2715;</button>
+    `;
+    container.appendChild(div);
+  }
+
+  function removeOsProfile(idx) {
+    const el = document.getElementById('os-profile-' + idx);
+    if (el) el.remove();
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
 {% endblock %}

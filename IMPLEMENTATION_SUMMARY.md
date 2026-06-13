@@ -1,7 +1,7 @@
 # User Management with Role Support - Implementation Summary
 
 ## Overview
-Successfully implemented a comprehensive user management system with role-based access control (RBAC) for the Linux Management Dashboard.
+Successfully implemented a comprehensive user management system with role-based access control (RBAC) for the FleetPilot.
 
 ## What Was Implemented
 

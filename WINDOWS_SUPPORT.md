@@ -1,8 +1,8 @@
-# Windows Support for Linux Management Dashboard
+# Windows Support for FleetPilot
 
 ## Overview
 
-The Linux Management Dashboard now supports managing Windows systems for both system updates (Windows Update) and software updates (winget). This document provides detailed information about Windows support implementation and usage.
+The FleetPilot now supports managing Windows systems for both system updates (Windows Update) and software updates (winget). This document provides detailed information about Windows support implementation and usage.
 
 ## Features
 
@@ -47,8 +47,8 @@ Download and install Python from https://www.python.org/downloads/
 
 ### Step 2: Clone the Repository
 ```powershell
-git clone https://github.com/ChristianHandy/linux-update-dashboard.git
-cd linux-update-dashboard
+git clone https://github.com/ChristianHandy/fleetpilot.git
+cd fleetpilot
 ```
 
 ### Step 3: Create Virtual Environment
@@ -293,7 +293,7 @@ A: Not currently. Consider testing on a non-production system first.
 ## Contributing
 
 Windows support is new! If you encounter issues or have suggestions:
-1. Check existing issues: https://github.com/ChristianHandy/Linux-Magement-Dashbord/issues
+1. Check existing issues: https://github.com/ChristianHandy/fleetpilot/issues
 2. Open a new issue with:
    - Windows version
    - Error messages

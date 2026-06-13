@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ current_lang|default('en') }}" data-theme="{{ current_theme|default('dark') }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Linux Management Dashboard{% endblock %}</title>
+  <title>{% block title %}FleetPilot{% endblock %}</title>
   <link rel="stylesheet" href="/static/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,52 +16,52 @@
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-      <div class="sidebar-brand-icon">&#x1F5A5;</div>
+      <div class="sidebar-brand-icon">&#x1F6E9;</div>
       <div class="sidebar-brand-text">
-        <span class="sidebar-brand-title">Linux Mgmt</span>
-        <span class="sidebar-brand-sub">Dashboard</span>
+        <span class="sidebar-brand-title">FleetPilot</span>
+        <span class="sidebar-brand-sub">Linux &amp; Windows</span>
       </div>
     </div>
 
     <nav class="sidebar-nav">
-      <span class="sidebar-section-label">Overview</span>
+      <span class="sidebar-section-label">{{ _('Overview') }}</span>
       <a class="sidebar-link {% if request.path == '/index' or request.path == '/' %}active{% endif %}" href="/index">
-        <span class="sidebar-icon">&#x1F3E0;</span> Home
+        <span class="sidebar-icon">&#x1F3E0;</span> {{ _('Home') }}
       </a>
 
-      <span class="sidebar-section-label">Management</span>
+      <span class="sidebar-section-label">{{ _('Management') }}</span>
       <a class="sidebar-link {% if request.path.startswith('/dashboard') %}active{% endif %}" href="/dashboard">
-        <span class="sidebar-icon">&#x1F504;</span> Update Dashboard
+        <span class="sidebar-icon">&#x1F504;</span> {{ _('Update Dashboard') }}
       </a>
       <a class="sidebar-link {% if request.path.startswith('/hosts') %}active{% endif %}" href="/hosts">
-        <span class="sidebar-icon">&#x1F5A7;</span> Manage Hosts
+        <span class="sidebar-icon">&#x1F5A7;</span> {{ _('Manage Hosts') }}
       </a>
       <a class="sidebar-link {% if request.path.startswith('/disks') %}active{% endif %}" href="/disks">
-        <span class="sidebar-icon">&#x1F4BE;</span> Disk Tools
+        <span class="sidebar-icon">&#x1F4BE;</span> {{ _('Disk Tools') }}
       </a>
 
-      <span class="sidebar-section-label">Settings</span>
+      <span class="sidebar-section-label">{{ _('Settings') }}</span>
       <a class="sidebar-link {% if request.path.startswith('/update_settings') %}active{% endif %}" href="/update_settings">
-        <span class="sidebar-icon">&#x2699;&#xFE0F;</span> Update Settings
+        <span class="sidebar-icon">&#x2699;&#xFE0F;</span> {{ _('Update Settings') }}
       </a>
       <a class="sidebar-link {% if request.path.startswith('/email_settings') %}active{% endif %}" href="/email_settings">
-        <span class="sidebar-icon">&#x2709;&#xFE0F;</span> Email Config
+        <span class="sidebar-icon">&#x2709;&#xFE0F;</span> {{ _('Email Config') }}
       </a>
 
-      <span class="sidebar-section-label">Account</span>
+      <span class="sidebar-section-label">{{ _('Account') }}</span>
       <a class="sidebar-link {% if request.path.startswith('/users/profile') %}active{% endif %}" href="/users/profile">
-        <span class="sidebar-icon">&#x1F464;</span> My Profile
+        <span class="sidebar-icon">&#x1F464;</span> {{ _('My Profile') }}
       </a>
       {% if is_admin is defined and is_admin %}
       <a class="sidebar-link {% if request.path.startswith('/users') and not request.path.startswith('/users/profile') %}active{% endif %}" href="/users">
-        <span class="sidebar-icon">&#x1F465;</span> User Management
+        <span class="sidebar-icon">&#x1F465;</span> {{ _('User Management') }}
       </a>
       {% endif %}
     </nav>
 
     <div class="sidebar-footer">
       <a class="sidebar-link" href="/logout">
-        <span class="sidebar-icon">&#x1F6AA;</span> Logout
+        <span class="sidebar-icon">&#x1F6AA;</span> {{ _('Logout') }}
       </a>
     </div>
   </aside>
@@ -76,16 +76,42 @@
       </div>
       <div class="topbar-actions">
         {% block topbar_actions %}{% endblock %}
-        <a class="btn btn-ghost btn-sm" href="/users/profile">&#x1F464; Profile</a>
+
+        <!-- Language Selector -->
+        <form method="POST" action="/set_language" style="display:inline;">
+          <input type="hidden" name="next" value="{{ request.path }}">
+          <select name="lang" class="lang-select" onchange="this.form.submit()" title="{{ _('Language') }}" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.35rem 0.65rem;font-size:0.8rem;color:var(--text-secondary);cursor:pointer;appearance:none;">
+            <option value="en" {% if current_lang == 'en' %}selected{% endif %}>🌐 EN</option>
+            <option value="de" {% if current_lang == 'de' %}selected{% endif %}>🇩🇪 DE</option>
+            <option value="es" {% if current_lang == 'es' %}selected{% endif %}>🇪🇸 ES</option>
+            <option value="fr" {% if current_lang == 'fr' %}selected{% endif %}>🇫🇷 FR</option>
+          </select>
+        </form>
+
+        <!-- Theme Toggle -->
+        <button class="theme-toggle" id="theme-toggle" title="{{ _('Toggle theme') }}" type="button">
+          <span class="theme-icon-light">&#x2600;&#xFE0F;</span>
+          <span class="theme-icon-dark">&#x1F319;</span>
+        </button>
+
+        <a class="btn btn-ghost btn-sm" href="/users/profile">&#x1F464; {{ _('Profile') }}</a>
       </div>
     </header>
 
     <!-- Page Content -->
     <main class="page-content">
-      {% with messages = get_flashed_messages() %}
+      {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-          {% for message in messages %}
-            <div class="alert">&#x2714; {{ message }}</div>
+          {% for category, message in messages %}
+            {% if category == 'error' %}
+              <div class="alert alert-danger">&#x26A0; {{ message }}</div>
+            {% elif category == 'warning' %}
+              <div class="alert alert-warning">&#x26A0; {{ message }}</div>
+            {% elif category == 'success' %}
+              <div class="alert alert-success">&#x2714; {{ message }}</div>
+            {% else %}
+              <div class="alert">&#x2714; {{ message }}</div>
+            {% endif %}
           {% endfor %}
         {% endif %}
       {% endwith %}
@@ -96,10 +122,29 @@
 </div>
 
 <script>
-  // Mobile sidebar toggle
+  // ---- Theme Toggle ----
+  (function() {
+    const saved = localStorage.getItem('fp_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+  })();
+
   document.addEventListener('DOMContentLoaded', function() {
+    const btn = document.getElementById('theme-toggle');
+    if (btn) {
+      btn.addEventListener('click', function() {
+        const html = document.documentElement;
+        const current = html.getAttribute('data-theme') || 'dark';
+        const next = current === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('fp_theme', next);
+        // Persist to server session
+        fetch('/set_theme?theme=' + next, {method:'POST'}).catch(()=>{});
+      });
+    }
+
+    // ---- Mobile sidebar toggle ----
     const sidebar = document.getElementById('sidebar');
-    const toggle = document.getElementById('sidebar-toggle');
+    const toggle  = document.getElementById('sidebar-toggle');
     if (toggle && sidebar) {
       toggle.addEventListener('click', function() {
         sidebar.classList.toggle('open');

@@ -1,9 +1,9 @@
-# Linux Management Dashboard
+# FleetPilot
 
-A comprehensive web dashboard combining system update management and disk tools for Linux and Windows computers.
+**FleetPilot** is a modern, self-hosted web dashboard for managing a fleet of Linux and Windows machines — featuring remote system updates, disk tools, multi-user RBAC, email notifications, multiboot OS profiles, and a responsive light/dark UI.
 
 > **Note:** This project merges functionality from two repositories:
-> - [linux-update-dashboard](https://github.com/ChristianHandy/linux-update-dashboard) - Remote system update management
+> - [fleetpilot](https://github.com/ChristianHandy/fleetpilot) - Remote system update management
 > - [Disk_Tools](https://github.com/ChristianHandy/Disk_Tools) - Disk formatting and SMART monitoring
 >
 > Both tools are now accessible from a unified interface after logging in.
@@ -56,8 +56,8 @@ A comprehensive web dashboard combining system update management and disk tools 
 ## Installation
 
 ### Linux Installation
-1. Clone repository: `git clone https://github.com/ChristianHandy/linux-update-dashboard.git`
-2. Enter project: `cd linux-update-dashboard`
+1. Clone repository: `git clone https://github.com/ChristianHandy/fleetpilot.git`
+2. Enter project: `cd fleetpilot`
 3. Create virtual env: `python3 -m venv venv`
 4. Activate: `source venv/bin/activate`
 5. Install requirements: `pip install -r requirements.txt`
@@ -74,8 +74,8 @@ A comprehensive web dashboard combining system update management and disk tools 
 7. Run: `python app.py` (requires sudo for disk management features)
 
 ### Windows Installation
-1. Clone repository: `git clone https://github.com/ChristianHandy/linux-update-dashboard.git`
-2. Enter project: `cd linux-update-dashboard`
+1. Clone repository: `git clone https://github.com/ChristianHandy/fleetpilot.git`
+2. Enter project: `cd fleetpilot`
 3. Create virtual env: `python -m venv venv`
 4. Activate: `venv\Scripts\activate`
 5. Install requirements: `pip install -r requirements.txt`
@@ -495,7 +495,7 @@ Backup and restore hosts.json
 
 ## Automatic Update Configuration
 
-The Linux Management Dashboard now includes comprehensive automatic update controls accessible via the Update Settings page (`/update_settings`).
+The FleetPilot now includes comprehensive automatic update controls accessible via the Update Settings page (`/update_settings`).
 
 ### Accessing Update Settings
 1. Log in to the dashboard
@@ -520,7 +520,7 @@ Choose how often automatic updates should run:
 Enable or disable update status notifications displayed on the dashboard.
 
 #### Dashboard Update Notifications
-Enable or disable notifications for new versions of the Linux Management Dashboard itself. When enabled:
+Enable or disable notifications for new versions of the FleetPilot itself. When enabled:
 - The system checks for new dashboard versions every 24 hours
 - Notifications appear for both official releases and new commits
 - Users can update the dashboard directly from the UI while preserving configurations
@@ -572,7 +572,7 @@ The Update Dashboard displays the current automatic update status:
 
 ## Dashboard Self-Update Feature
 
-The Linux Management Dashboard includes a self-update feature that automatically notifies users when a new version of the dashboard itself is available.
+The FleetPilot includes a self-update feature that automatically notifies users when a new version of the dashboard itself is available.
 
 ### Features
 
@@ -654,7 +654,7 @@ To manually check for updates:
 
 ## Email Reporting
 
-The Linux Management Dashboard includes comprehensive email notification capabilities to keep administrators informed about system status and issues.
+The FleetPilot includes comprehensive email notification capabilities to keep administrators informed about system status and issues.
 
 ### Features
 

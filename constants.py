@@ -1,4 +1,4 @@
-# constants.py - Shared constants for the Linux Management Dashboard
+# constants.py - Shared constants for the FleetPilot
 
 import platform
 

@@ -1,40 +1,122 @@
 {% extends "base.html" %}
 
-{% block title %}Edit Host — Linux Management{% endblock %}
+{% block title %}{{ _('Edit Host') }}: {{ name }} — FleetPilot{% endblock %}
 {% block page_icon %}&#x270F;{% endblock %}
-{% block page_title %}Edit Host: {{ name }}{% endblock %}
+{% block page_title %}{{ _('Edit Host') }}: {{ name }}{% endblock %}
+
+{% block topbar_actions %}
+<a class="btn btn-ghost btn-sm" href="/hosts">&#x2190; {{ _('Back to Hosts') }}</a>
+{% endblock %}
 
 {% block content %}
-
-<div style="max-width:560px;">
+<div style="max-width:640px;">
   <div class="card">
     <div class="card-header">
-      <h3>&#x270F; Edit Host Configuration</h3>
+      <h3>&#x270F; {{ _('Edit Host Configuration') }}</h3>
     </div>
     <form method="post">
       <div class="form-group">
-        <label class="form-label">Display Name</label>
-        <input class="form-control" name="name" value="{{ name }}" placeholder="e.g. Web Server">
+        <label class="form-label">{{ _('Display Name') }}</label>
+        <input class="form-control" name="name" value="{{ name }}" placeholder="{{ _('e.g. Web Server') }}">
       </div>
       <div class="form-group">
-        <label class="form-label">Host (IP or Hostname)</label>
-        <input class="form-control" name="host" value="{{ data.host }}" placeholder="192.168.1.100 or localhost">
+        <label class="form-label">{{ _('IP Address / Hostname') }}</label>
+        <input class="form-control" name="host" value="{{ data.host }}" placeholder="192.168.1.100 / localhost">
       </div>
       <div class="form-group">
-        <label class="form-label">SSH User</label>
-        <input class="form-control" name="user" value="{{ data.user }}" placeholder="username">
+        <label class="form-label">{{ _('SSH User') }}</label>
+        <input class="form-control" name="user" value="{{ data.user }}" placeholder="{{ _('e.g. admin') }}">
       </div>
       <div class="form-group">
-        <label class="form-label">MAC Address <span class="text-muted">(optional)</span></label>
-        <input class="form-control" name="mac" value="{{ data.mac if data.mac else '' }}" placeholder="00:11:22:33:44:55">
-        <p class="form-hint">Used for automatic IP change detection on DHCP hosts.</p>
+        <label class="form-label">{{ _('MAC Address') }} <span class="text-muted">({{ _('optional') }})</span></label>
+        <input class="form-control" name="mac" value="{{ data.mac if data.mac else '' }}" placeholder="AA:BB:CC:DD:EE:FF">
+        <p class="form-hint">{{ _('Used for automatic IP change detection on DHCP hosts.') }}</p>
       </div>
+
+      <!-- OS Profiles (Multiboot) — Issue #36 -->
+      <div style="padding-top:1rem;border-top:1px solid var(--border);margin-bottom:1rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+          <label class="form-label" style="margin-bottom:0;">
+            &#x1F4BF; {{ _('OS Profiles (Multiboot)') }}
+            <span style="color:var(--text-muted);font-weight:400;font-size:0.8rem;"> — {{ _('optional') }}</span>
+          </label>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="addOsProfile()">&#x2B; {{ _('Add OS Profile') }}</button>
+        </div>
+        <div id="os-profiles-container">
+          {% if data.os_profiles %}
+            {% for profile in data.os_profiles %}
+            <!-- pre-filled profile {{ loop.index0 }} -->
+            {% endif %}
+          {% endif %}
+        </div>
+        <p class="form-hint">{{ _('For dual-boot or multi-OS machines, define each installed OS. The default OS will be used for updates.') }}</p>
+      </div>
+
       <div class="btn-group">
-        <button class="btn btn-primary" type="submit">&#x1F4BE; Save Changes</button>
-        <a class="btn btn-ghost" href="/hosts">&#x2190; Cancel</a>
+        <button class="btn btn-primary" type="submit">&#x1F4BE; {{ _('Save Changes') }}</button>
+        <a class="btn btn-ghost" href="/hosts">&#x2190; {{ _('Cancel') }}</a>
       </div>
     </form>
   </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
+<script>
+  let osProfileCount = 0;
+
+  const OS_TYPES = [
+    {value: 'ubuntu',  label: 'Ubuntu / Debian'},
+    {value: 'fedora',  label: 'Fedora'},
+    {value: 'centos',  label: 'CentOS / RHEL'},
+    {value: 'arch',    label: 'Arch Linux'},
+    {value: 'windows', label: 'Windows'},
+    {value: 'other',   label: '{{ _("Other") }}'},
+  ];
+
+  function addOsProfile(name='', type='ubuntu', isDefault=false) {
+    const idx = osProfileCount++;
+    const container = document.getElementById('os-profiles-container');
+    const div = document.createElement('div');
+    div.id = 'os-profile-' + idx;
+    div.style.cssText = 'display:grid;grid-template-columns:1fr 180px 130px 36px;gap:0.5rem;align-items:center;margin-bottom:0.5rem;';
+
+    const typeOptions = OS_TYPES.map(t =>
+      `<option value="${t.value}" ${type===t.value?'selected':''}>${t.label}</option>`
+    ).join('');
+
+    div.innerHTML = `
+      <input class="form-control" type="text" name="os_name"
+             placeholder="{{ _('OS Name') }}" value="${escapeHtml(name)}">
+      <select class="form-control" name="os_type">${typeOptions}</select>
+      <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.85rem;color:var(--text-secondary);
+                    cursor:pointer;padding:0.45rem 0.6rem;border:1px solid var(--border);
+                    border-radius:var(--radius-md);background:var(--bg-elevated);">
+        <input type="checkbox" name="os_default" value="${idx}" ${isDefault?'checked':''}
+               style="width:16px;height:16px;accent-color:var(--accent-blue);">
+        {{ _('Default') }}
+      </label>
+      <button type="button" onclick="removeOsProfile(${idx})"
+              class="btn btn-danger btn-sm" style="padding:0.4rem 0.6rem;">&#x2715;</button>
+    `;
+    container.appendChild(div);
+  }
+
+  function removeOsProfile(idx) {
+    const el = document.getElementById('os-profile-' + idx);
+    if (el) el.remove();
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Pre-fill existing OS profiles from server data
+  document.addEventListener('DOMContentLoaded', function() {
+    const existing = {{ data.os_profiles | tojson if data.os_profiles else '[]' }};
+    existing.forEach(function(p) {
+      addOsProfile(p.name, p.type, p.default);
+    });
+  });
+</script>
 {% endblock %}

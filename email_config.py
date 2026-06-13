@@ -1,5 +1,5 @@
 """
-Email configuration management for the Linux Management Dashboard.
+Email configuration management for the FleetPilot.
 Handles email settings for scheduled reports and error notifications.
 """
 import json
