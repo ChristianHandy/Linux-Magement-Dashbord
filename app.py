@@ -112,10 +112,46 @@ def is_online(host, user):
     except:
         return False
 
+# Predefined tag palette for hosts
+HOST_TAG_PRESETS = [
+    "Server", "PC", "VM", "Container", "Laptop", "NAS",
+    "Router", "Raspberry Pi", "Workstation", "IoT", "Database",
+    "Web Server", "Mail Server", "Backup", "Monitoring"
+]
+
+HOST_ENVIRONMENTS = ["Production", "Staging", "Development", "Testing", "Lab"]
+HOST_CRITICALITY  = ["Critical", "High", "Medium", "Low"]
+
+def normalize_host(data):
+    """Ensure all optional host fields have sensible defaults."""
+    defaults = {
+        "host": "",
+        "user": "",
+        "mac": "",
+        "description": "",
+        "notes": "",
+        "group": "",
+        "location": "",
+        "environment": "Production",
+        "criticality": "Medium",
+        "tags": [],
+        "port": 22,
+        "ssh_key": "",
+        "os_profiles": [],
+        "last_update": None,
+        "last_seen": None,
+    }
+    defaults.update(data)
+    # Ensure tags is always a list
+    if isinstance(defaults["tags"], str):
+        defaults["tags"] = [t.strip() for t in defaults["tags"].split(",") if t.strip()]
+    return defaults
+
 def load_hosts():
     try:
         with open("hosts.json", "r") as f:
-            return json.load(f)
+            raw = json.load(f)
+        return {name: normalize_host(data) for name, data in raw.items()}
     except Exception:
         return {}
 
@@ -201,7 +237,42 @@ def logout():
 @login_required
 def index():
     """Main menu/landing page showing both tools"""
-    return render_template("index.html")
+    hosts = load_hosts()
+    # Compute quick stats for the home page
+    try:
+        history = json.load(open("history.json"))
+    except Exception:
+        history = []
+    try:
+        disk_count = len(disktool_core.list_disks())
+    except Exception:
+        disk_count = 0
+    user_id = session.get("user_id")
+    try:
+        all_users = user_management.get_all_users()
+        active_users = len([u for u in all_users if u.get("active", True)])
+    except Exception:
+        active_users = 0
+    # Tag/environment summary
+    all_tags = []
+    env_counts = {}
+    for h in hosts.values():
+        all_tags.extend(h.get("tags", []))
+        env = h.get("environment", "Production")
+        env_counts[env] = env_counts.get(env, 0) + 1
+    tag_counts = {}
+    for t in all_tags:
+        tag_counts[t] = tag_counts.get(t, 0) + 1
+    return render_template(
+        "index.html",
+        host_count=len(hosts),
+        disk_count=disk_count,
+        update_count=len(history),
+        active_users=active_users,
+        tag_counts=tag_counts,
+        env_counts=env_counts,
+        hosts=hosts,
+    )
 
 @app.route("/dashboard")
 @login_required
@@ -425,11 +496,22 @@ def manage_hosts():
         name = request.form.get("name", "").strip()
         host = request.form.get("host", "").strip()
         user = request.form.get("user", "").strip()
-        mac = request.form.get("mac", "").strip()
+        mac  = request.form.get("mac", "").strip()
         if name:
-            host_data = {"host": host, "user": user}
-            if mac:
-                host_data["mac"] = mac
+            host_data = {
+                "host": host,
+                "user": user,
+                "mac": mac,
+                "description": request.form.get("description", "").strip(),
+                "notes":       request.form.get("notes", "").strip(),
+                "group":       request.form.get("group", "").strip(),
+                "location":    request.form.get("location", "").strip(),
+                "environment": request.form.get("environment", "Production"),
+                "criticality": request.form.get("criticality", "Medium"),
+                "port":        int(request.form.get("port", 22) or 22),
+                "ssh_key":     request.form.get("ssh_key", "").strip(),
+                "tags":        [t.strip() for t in request.form.get("tags", "").split(",") if t.strip()],
+            }
             # Multiboot: parse OS profiles from form (issue #36)
             os_names    = request.form.getlist("os_name")
             os_types    = request.form.getlist("os_type")
@@ -443,14 +525,19 @@ def manage_hosts():
                 is_default = str(i) in os_defaults or oname in os_defaults
                 os_profiles.append({"name": oname, "type": otype, "default": is_default})
             if os_profiles:
-                # Ensure exactly one default
                 if not any(p["default"] for p in os_profiles):
                     os_profiles[0]["default"] = True
-                host_data["os_profiles"] = os_profiles
+            host_data["os_profiles"] = os_profiles
             hosts[name] = host_data
             save_hosts(hosts)
         return redirect("/hosts")
-    return render_template("hosts.html", hosts=hosts)
+    return render_template(
+        "hosts.html",
+        hosts=hosts,
+        tag_presets=HOST_TAG_PRESETS,
+        environments=HOST_ENVIRONMENTS,
+        criticalities=HOST_CRITICALITY,
+    )
 
 # Edit host
 @app.route("/hosts/edit/<orig_name>", methods=["GET", "POST"])
@@ -468,14 +555,27 @@ def edit_host(orig_name):
         new_name = request.form.get("name", "").strip()
         host = request.form.get("host", "").strip()
         user = request.form.get("user", "").strip()
-        mac = request.form.get("mac", "").strip()
+        mac  = request.form.get("mac", "").strip()
         if new_name:
-            # If the name changed, remove the old key
             if new_name != orig_name:
                 hosts.pop(orig_name, None)
-            host_data = {"host": host, "user": user}
-            if mac:
-                host_data["mac"] = mac
+            host_data = {
+                "host": host,
+                "user": user,
+                "mac": mac,
+                "description": request.form.get("description", "").strip(),
+                "notes":       request.form.get("notes", "").strip(),
+                "group":       request.form.get("group", "").strip(),
+                "location":    request.form.get("location", "").strip(),
+                "environment": request.form.get("environment", "Production"),
+                "criticality": request.form.get("criticality", "Medium"),
+                "port":        int(request.form.get("port", 22) or 22),
+                "ssh_key":     request.form.get("ssh_key", "").strip(),
+                "tags":        [t.strip() for t in request.form.get("tags", "").split(",") if t.strip()],
+                # Preserve timestamps
+                "last_update": hosts.get(orig_name, {}).get("last_update"),
+                "last_seen":   hosts.get(orig_name, {}).get("last_seen"),
+            }
             # Multiboot: parse OS profiles from form (issue #36)
             os_names    = request.form.getlist("os_name")
             os_types    = request.form.getlist("os_type")
@@ -491,12 +591,19 @@ def edit_host(orig_name):
             if os_profiles:
                 if not any(p["default"] for p in os_profiles):
                     os_profiles[0]["default"] = True
-                host_data["os_profiles"] = os_profiles
+            host_data["os_profiles"] = os_profiles
             hosts[new_name] = host_data
             save_hosts(hosts)
         return redirect("/hosts")
     # GET
-    return render_template("edit_host.html", name=orig_name, data=hosts[orig_name])
+    return render_template(
+        "edit_host.html",
+        name=orig_name,
+        data=hosts[orig_name],
+        tag_presets=HOST_TAG_PRESETS,
+        environments=HOST_ENVIRONMENTS,
+        criticalities=HOST_CRITICALITY,
+    )
 
 # Delete host
 @app.route("/hosts/delete/<name>", methods=["POST"])

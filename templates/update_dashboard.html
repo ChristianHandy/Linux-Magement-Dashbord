@@ -17,10 +17,8 @@
     <h3>&#x1F514; Dashboard Update Available</h3>
     <span class="badge badge-blue">{{ update_notification.type }}</span>
   </div>
-  <p>
-    <strong>{{ update_notification.description }}</strong><br>
-    <span class="text-muted">Version {{ update_notification.version }}</span>
-  </p>
+  <p><strong>{{ update_notification.description }}</strong><br>
+     <span class="text-muted">Version {{ update_notification.version }}</span></p>
   <div class="btn-group">
     {% if is_admin %}
     <a class="btn btn-success btn-sm" href="/dashboard_version/update">&#x2B06; Update Now</a>
@@ -34,7 +32,29 @@
 </div>
 {% endif %}
 
-<!-- Auto-Update Status -->
+<!-- ── Stats Row ───────────────────────────────────────────── -->
+{% if hosts %}
+<div class="stat-grid-v2" style="margin-bottom:1.5rem;">
+  <div class="stat-card-v2 blue">
+    <div class="stat-card-v2-value">{{ hosts|length }}</div>
+    <div class="stat-card-v2-label">&#x1F5A7; Total Hosts</div>
+  </div>
+  <div class="stat-card-v2 green">
+    <div class="stat-card-v2-value">{{ status.values()|selectattr('==', 'equalto', true)|list|length }}</div>
+    <div class="stat-card-v2-label">&#x1F7E2; Online</div>
+  </div>
+  <div class="stat-card-v2 red">
+    <div class="stat-card-v2-value">{{ status.values()|selectattr('==', 'equalto', false)|list|length }}</div>
+    <div class="stat-card-v2-label">&#x1F534; Offline</div>
+  </div>
+  <div class="stat-card-v2 purple">
+    <div class="stat-card-v2-value">{{ history|length if history else 0 }}</div>
+    <div class="stat-card-v2-label">&#x1F4DC; Updates Run</div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Auto-Update Status ──────────────────────────────────── -->
 <div class="card {% if auto_updates_enabled %}card-green{% endif %}" style="margin-bottom:1.5rem;">
   <div class="card-header">
     <h3>&#x23F0; Automatic Updates</h3>
@@ -57,7 +77,7 @@
   {% endif %}
 </div>
 
-<!-- Hosts -->
+<!-- ── Managed Hosts ──────────────────────────────────────── -->
 <div class="card-header" style="margin-bottom:1rem; padding:0;">
   <h3>&#x1F5A7; Managed Hosts</h3>
   <a class="btn btn-secondary btn-sm" href="/hosts">Manage Hosts</a>
@@ -65,26 +85,84 @@
 
 {% if hosts %}
 <div class="host-grid">
-  {% for name in hosts %}
-  <div class="host-card {% if status[name] %}online{% else %}offline{% endif %}">
-    <div class="host-card-header">
-      <div>
-        <div class="host-card-name">{{ name }}</div>
-        <div class="host-card-meta">
+  {% for name, h in hosts.items() %}
+  {% set online = status[name] %}
+  {% set env_slug = (h.environment|lower).replace(' ','') %}
+  {% set crit_slug = h.criticality|lower %}
+  <div class="host-card-v2 {% if online %}online{% else %}offline{% endif %}">
+
+    <!-- Header -->
+    <div class="hc-header">
+      <div style="min-width:0;flex:1;">
+        <div class="hc-title-row">
+          <span class="hc-name">{{ name }}</span>
+          {% if h.host in localhost_identifiers or h.host|lower in localhost_identifiers %}
+            <span class="badge badge-local">&#x1F3E0; Local</span>
+          {% endif %}
+        </div>
+        <div class="hc-badges" style="margin-top:0.4rem;">
           <span class="status-badge">
-            <span class="status-dot {% if status[name] %}online{% else %}offline{% endif %}"></span>
-            <span class="{% if status[name] %}status-online{% else %}status-offline{% endif %}">
-              {% if status[name] %}Online{% else %}Offline{% endif %}
+            <span class="status-dot {% if online %}online{% else %}offline{% endif %}"></span>
+            <span class="{% if online %}status-online{% else %}status-offline{% endif %}" style="font-size:0.78rem;">
+              {% if online %}Online{% else %}Offline{% endif %}
             </span>
           </span>
+          <span class="env-badge env-{{ env_slug }}">{{ h.environment }}</span>
+          <span class="crit-badge crit-{{ crit_slug }}">{{ h.criticality }}</span>
+          {% if h.group %}
+          <span class="badge badge-gray">&#x1F4C1; {{ h.group }}</span>
+          {% endif %}
         </div>
       </div>
     </div>
-    <div class="host-card-actions">
+
+    <!-- Description -->
+    {% if h.description %}
+    <div class="hc-description">{{ h.description }}</div>
+    {% endif %}
+
+    <!-- Meta -->
+    <div class="hc-meta">
+      <span class="hc-meta-item"><span class="icon">&#x1F4BB;</span> {{ h.host }}</span>
+      <span class="hc-meta-item"><span class="icon">&#x1F464;</span> {{ h.user }}</span>
+      {% if h.location %}
+      <span class="hc-meta-item"><span class="icon">&#x1F4CD;</span> {{ h.location }}</span>
+      {% endif %}
+      {% if h.last_update %}
+      <span class="hc-meta-item"><span class="icon">&#x1F504;</span> {{ h.last_update }}</span>
+      {% endif %}
+    </div>
+
+    <!-- Tags -->
+    {% if h.tags %}
+    <div class="hc-tags">
+      {% for tag in h.tags %}
+      {% set slug = (tag|lower).replace(' ','-') %}
+      <span class="tag-chip tag-chip-default tag-chip-{{ slug }}">{{ tag }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- OS Profiles -->
+    {% if h.os_profiles %}
+    <div style="padding:0 1.1rem 0.6rem; display:flex; flex-wrap:wrap; gap:0.3rem;">
+      {% for p in h.os_profiles %}
+      <span class="badge {% if p.default %}badge-blue{% else %}badge-gray{% endif %}">
+        {% if p.type == 'windows' %}&#x1FA9F;{% else %}&#x1F427;{% endif %}
+        {{ p.name }}{% if p.default %} &#x2605;{% endif %}
+      </span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Actions -->
+    {% if not current_user_id or 'operator' in current_user_roles or 'admin' in current_user_roles %}
+    <div class="hc-actions">
       <a class="btn btn-primary btn-sm" href="/update/{{ name }}">&#x2B06; Full Update</a>
-      <a class="btn btn-purple btn-sm" href="/update_repo/{{ name }}" title="Update packages from repository">&#x1F4E6; Repo Update</a>
+      <a class="btn btn-purple btn-sm" href="/update_repo/{{ name }}">&#x1F4E6; Repo Update</a>
       <a class="btn btn-secondary btn-sm" href="/hosts/edit/{{ name }}">&#x270F; Edit</a>
     </div>
+    {% endif %}
   </div>
   {% endfor %}
 </div>
@@ -97,25 +175,59 @@
 </div>
 {% endif %}
 
-<!-- Update History -->
+<!-- ── Update History ─────────────────────────────────────── -->
 <div style="margin-top:2rem;">
   <div class="card-header" style="margin-bottom:1rem; padding:0;">
     <h3>&#x1F4DC; Update History</h3>
   </div>
   {% if history %}
-  <div class="history-list">
-    {% for h in history %}
-    <div class="history-item">
-      <span class="history-time">&#x1F552; {{ h.time }}</span>
-      <span class="history-host">{{ h.host }}</span>
-      <span class="history-status">
-        {{ h.status }}
-        {% if h.type %}
-          <span class="badge badge-gray" style="margin-left:0.5rem;">{{ h.type }}</span>
-        {% endif %}
-      </span>
-    </div>
-    {% endfor %}
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Host</th>
+          <th>Status</th>
+          <th>Type</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in history %}
+        <tr>
+          <td style="color:var(--text-muted);white-space:nowrap;">&#x1F552; {{ entry.time }}</td>
+          <td>
+            <strong>{{ entry.host }}</strong>
+            {% if hosts.get(entry.host) %}
+            {% set h = hosts[entry.host] %}
+            {% if h.tags %}
+            <div style="margin-top:0.2rem;display:flex;gap:0.25rem;flex-wrap:wrap;">
+              {% for tag in h.tags[:2] %}
+              <span class="tag-chip tag-chip-default" style="font-size:0.65rem;padding:0.1rem 0.4rem;">{{ tag }}</span>
+              {% endfor %}
+            </div>
+            {% endif %}
+            {% endif %}
+          </td>
+          <td>
+            {% if 'success' in (entry.status|lower) or 'ok' in (entry.status|lower) %}
+            <span class="badge badge-green">&#x2714; {{ entry.status }}</span>
+            {% elif 'fail' in (entry.status|lower) or 'error' in (entry.status|lower) %}
+            <span class="badge badge-red">&#x2715; {{ entry.status }}</span>
+            {% else %}
+            <span class="badge badge-gray">{{ entry.status }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if entry.type %}
+            <span class="badge badge-blue">{{ entry.type }}</span>
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
   {% else %}
   <div class="empty-state" style="padding:2rem;">

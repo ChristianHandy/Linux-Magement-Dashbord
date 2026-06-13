@@ -9,114 +9,252 @@
 {% endblock %}
 
 {% block content %}
-<div style="max-width:640px;">
+<div style="max-width:760px;">
   <div class="card">
     <div class="card-header">
       <h3>&#x270F; {{ _('Edit Host Configuration') }}</h3>
+      <div style="display:flex;gap:0.4rem;">
+        {% if data.environment %}
+        <span class="env-badge env-{{ (data.environment|lower).replace(' ','') }}">{{ data.environment }}</span>
+        {% endif %}
+        {% if data.criticality %}
+        <span class="crit-badge crit-{{ data.criticality|lower }}">{{ data.criticality }}</span>
+        {% endif %}
+      </div>
     </div>
     <form method="post">
-      <div class="form-group">
-        <label class="form-label">{{ _('Display Name') }}</label>
-        <input class="form-control" name="name" value="{{ name }}" placeholder="{{ _('e.g. Web Server') }}">
+
+      <!-- Basic Info -->
+      <div class="form-section"><span class="form-section-title">&#x1F4CB; Basic Information</span></div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">{{ _('Display Name') }}</label>
+          <input type="text" name="name" value="{{ name }}" placeholder="{{ _('e.g. Web Server') }}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <input type="text" name="description" value="{{ data.description or '' }}"
+                 placeholder="Short description of this host">
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">{{ _('IP Address / Hostname') }}</label>
-        <input class="form-control" name="host" value="{{ data.host }}" placeholder="192.168.1.100 / localhost">
+      <div class="form-grid-3">
+        <div class="form-group">
+          <label class="form-label">{{ _('IP Address / Hostname') }}</label>
+          <input type="text" name="host" value="{{ data.host }}" placeholder="192.168.1.100 / localhost" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">{{ _('SSH User') }}</label>
+          <input type="text" name="user" value="{{ data.user }}" placeholder="{{ _('e.g. admin') }}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">SSH Port</label>
+          <input type="number" name="port" value="{{ data.port or 22 }}" min="1" max="65535">
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">{{ _('SSH User') }}</label>
-        <input class="form-control" name="user" value="{{ data.user }}" placeholder="{{ _('e.g. admin') }}">
-      </div>
-      <div class="form-group">
-        <label class="form-label">{{ _('MAC Address') }} <span class="text-muted">({{ _('optional') }})</span></label>
-        <input class="form-control" name="mac" value="{{ data.mac if data.mac else '' }}" placeholder="AA:BB:CC:DD:EE:FF">
-        <p class="form-hint">{{ _('Used for automatic IP change detection on DHCP hosts.') }}</p>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label class="form-label">{{ _('MAC Address') }} <span class="text-muted">({{ _('optional') }})</span></label>
+          <input type="text" name="mac" value="{{ data.mac or '' }}" placeholder="AA:BB:CC:DD:EE:FF">
+          <div class="form-hint">{{ _('Used for automatic IP change detection on DHCP hosts.') }}</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">SSH Key Path <span class="text-muted">(optional)</span></label>
+          <input type="text" name="ssh_key" value="{{ data.ssh_key or '' }}" placeholder="~/.ssh/id_rsa">
+        </div>
       </div>
 
-      <!-- OS Profiles (Multiboot) — Issue #36 -->
-      <div style="padding-top:1rem;border-top:1px solid var(--border);margin-bottom:1rem;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
-          <label class="form-label" style="margin-bottom:0;">
-            &#x1F4BF; {{ _('OS Profiles (Multiboot)') }}
-            <span style="color:var(--text-muted);font-weight:400;font-size:0.8rem;"> — {{ _('optional') }}</span>
-          </label>
-          <button type="button" class="btn btn-ghost btn-sm" onclick="addOsProfile()">&#x2B; {{ _('Add OS Profile') }}</button>
+      <!-- Classification -->
+      <div class="form-section"><span class="form-section-title">&#x1F3F7; Classification</span></div>
+      <div class="form-grid-3">
+        <div class="form-group">
+          <label class="form-label">Environment</label>
+          <select name="environment">
+            {% for env in environments %}
+            <option value="{{ env }}" {% if data.environment == env %}selected{% endif %}>{{ env }}</option>
+            {% endfor %}
+          </select>
         </div>
-        <div id="os-profiles-container">
-          {% if data.os_profiles %}
-            {% for profile in data.os_profiles %}
-            <!-- pre-filled profile {{ loop.index0 }} -->
-            {% endif %}
-          {% endif %}
+        <div class="form-group">
+          <label class="form-label">Criticality</label>
+          <select name="criticality">
+            {% for c in criticalities %}
+            <option value="{{ c }}" {% if data.criticality == c %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
         </div>
-        <p class="form-hint">{{ _('For dual-boot or multi-OS machines, define each installed OS. The default OS will be used for updates.') }}</p>
+        <div class="form-group">
+          <label class="form-label">Group / Team</label>
+          <input type="text" name="group" value="{{ data.group or '' }}"
+                 placeholder="e.g. Backend, DevOps, Lab">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Location / Site</label>
+        <input type="text" name="location" value="{{ data.location or '' }}"
+               placeholder="e.g. Rack A3, Home Lab, AWS eu-central-1">
       </div>
 
-      <div class="btn-group">
+      <!-- Tags -->
+      <div class="form-section"><span class="form-section-title">&#x1F3F7; Tags</span></div>
+      <div class="form-group">
+        <label class="form-label">Tags</label>
+        <div class="tag-input-wrapper" id="tagWrapper">
+          <div id="tagChips" style="display:contents;"></div>
+          <input type="text" class="tag-input-inner" id="tagInput"
+                 placeholder="Type tag and press Enter…" autocomplete="off">
+          <input type="hidden" name="tags" id="tagsHidden" value="{{ data.tags|join(',') if data.tags else '' }}">
+        </div>
+        <div class="tag-presets" id="tagPresets">
+          {% for tag in tag_presets %}
+          <button type="button" class="tag-preset-btn" onclick="addPresetTag('{{ tag }}')">{{ tag }}</button>
+          {% endfor %}
+        </div>
+        <div class="form-hint">Click a preset or type your own. Press Enter or comma to add a tag.</div>
+      </div>
+
+      <!-- Notes -->
+      <div class="form-section"><span class="form-section-title">&#x1F4DD; Notes</span></div>
+      <div class="form-group">
+        <label class="form-label">Notes <span class="text-muted">(internal)</span></label>
+        <textarea name="notes" class="notes-textarea"
+                  placeholder="Internal notes, maintenance info, credentials hints…">{{ data.notes or '' }}</textarea>
+      </div>
+
+      <!-- OS Profiles (Multiboot) -->
+      <div class="form-section" style="margin-top:1.25rem;">
+        <button type="button" class="collapsible-toggle" id="osToggle" onclick="toggleOS()">
+          <span>&#x1F4BF; {{ _('OS Profiles (Multiboot)') }} — <span style="font-weight:400;color:var(--text-muted);">{{ _('optional') }}</span></span>
+          <span class="arrow" id="osArrow">&#x25BC;</span>
+        </button>
+      </div>
+      <div class="collapsible-body {% if data.os_profiles %}open{% endif %}" id="osBody">
+        <div id="os-profiles-container"></div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="addOsProfile()">+ {{ _('Add OS Profile') }}</button>
+        <div class="form-hint" style="margin-top:0.5rem;">{{ _('For dual-boot or multi-OS machines, define each installed OS. The default OS will be used for updates.') }}</div>
+      </div>
+
+      <div class="btn-group" style="margin-top:1.5rem;">
         <button class="btn btn-primary" type="submit">&#x1F4BE; {{ _('Save Changes') }}</button>
         <a class="btn btn-ghost" href="/hosts">&#x2190; {{ _('Cancel') }}</a>
       </div>
     </form>
   </div>
+
+  <!-- Metadata Info -->
+  {% if data.last_update or data.last_seen %}
+  <div class="card" style="margin-top:1rem;padding:0.9rem 1.1rem;">
+    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;font-size:0.82rem;color:var(--text-muted);">
+      {% if data.last_update %}
+      <span>&#x1F504; Last update: <strong style="color:var(--text-secondary);">{{ data.last_update }}</strong></span>
+      {% endif %}
+      {% if data.last_seen %}
+      <span>&#x1F4F6; Last seen: <strong style="color:var(--text-secondary);">{{ data.last_seen }}</strong></span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  let osProfileCount = 0;
+/* ── Tag Input ─────────────────────────────────────────────── */
+let currentTags = {{ data.tags | tojson if data.tags else '[]' }};
 
-  const OS_TYPES = [
-    {value: 'ubuntu',  label: 'Ubuntu / Debian'},
-    {value: 'fedora',  label: 'Fedora'},
-    {value: 'centos',  label: 'CentOS / RHEL'},
-    {value: 'arch',    label: 'Arch Linux'},
-    {value: 'windows', label: 'Windows'},
-    {value: 'other',   label: '{{ _("Other") }}'},
-  ];
-
-  function addOsProfile(name='', type='ubuntu', isDefault=false) {
-    const idx = osProfileCount++;
-    const container = document.getElementById('os-profiles-container');
-    const div = document.createElement('div');
-    div.id = 'os-profile-' + idx;
-    div.style.cssText = 'display:grid;grid-template-columns:1fr 180px 130px 36px;gap:0.5rem;align-items:center;margin-bottom:0.5rem;';
-
-    const typeOptions = OS_TYPES.map(t =>
-      `<option value="${t.value}" ${type===t.value?'selected':''}>${t.label}</option>`
-    ).join('');
-
-    div.innerHTML = `
-      <input class="form-control" type="text" name="os_name"
-             placeholder="{{ _('OS Name') }}" value="${escapeHtml(name)}">
-      <select class="form-control" name="os_type">${typeOptions}</select>
-      <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.85rem;color:var(--text-secondary);
-                    cursor:pointer;padding:0.45rem 0.6rem;border:1px solid var(--border);
-                    border-radius:var(--radius-md);background:var(--bg-elevated);">
-        <input type="checkbox" name="os_default" value="${idx}" ${isDefault?'checked':''}
-               style="width:16px;height:16px;accent-color:var(--accent-blue);">
-        {{ _('Default') }}
-      </label>
-      <button type="button" onclick="removeOsProfile(${idx})"
-              class="btn btn-danger btn-sm" style="padding:0.4rem 0.6rem;">&#x2715;</button>
-    `;
-    container.appendChild(div);
-  }
-
-  function removeOsProfile(idx) {
-    const el = document.getElementById('os-profile-' + idx);
-    if (el) el.remove();
-  }
-
-  function escapeHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  // Pre-fill existing OS profiles from server data
-  document.addEventListener('DOMContentLoaded', function() {
-    const existing = {{ data.os_profiles | tojson if data.os_profiles else '[]' }};
-    existing.forEach(function(p) {
-      addOsProfile(p.name, p.type, p.default);
-    });
+function renderTagChips() {
+  const wrapper = document.getElementById('tagWrapper');
+  const input   = document.getElementById('tagInput');
+  const hidden  = document.getElementById('tagsHidden');
+  wrapper.querySelectorAll('.tag-chip').forEach(el => el.remove());
+  currentTags.forEach((tag, i) => {
+    const chip = document.createElement('span');
+    const slug = tag.toLowerCase().replace(/\s+/g, '-');
+    chip.className = 'tag-chip tag-chip-default tag-chip-' + slug;
+    chip.style.cssText = 'display:inline-flex;align-items:center;gap:0.3rem;';
+    chip.innerHTML = tag + ' <button type="button" class="tag-chip-remove" onclick="removeTag(' + i + ')">&#x2715;</button>';
+    wrapper.insertBefore(chip, input);
   });
+  hidden.value = currentTags.join(',');
+  document.querySelectorAll('.tag-preset-btn').forEach(btn => {
+    btn.classList.toggle('active', currentTags.includes(btn.textContent.trim()));
+  });
+}
+
+function addTag(tag) {
+  tag = tag.trim();
+  if (tag && !currentTags.includes(tag)) { currentTags.push(tag); renderTagChips(); }
+}
+function removeTag(i) { currentTags.splice(i, 1); renderTagChips(); }
+function addPresetTag(tag) {
+  if (currentTags.includes(tag)) currentTags = currentTags.filter(t => t !== tag);
+  else addTag(tag);
+  renderTagChips();
+}
+
+const tagInput = document.getElementById('tagInput');
+tagInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(this.value); this.value = ''; }
+});
+tagInput.addEventListener('blur', function() {
+  if (this.value.trim()) { addTag(this.value); this.value = ''; }
+});
+document.getElementById('tagWrapper').addEventListener('click', () => tagInput.focus());
+
+// Render initial tags
+renderTagChips();
+
+/* ── OS Profiles ───────────────────────────────────────────── */
+let osProfileCount = 0;
+const OS_TYPES = [
+  {value:'ubuntu',  label:'Ubuntu / Debian'},
+  {value:'fedora',  label:'Fedora'},
+  {value:'centos',  label:'CentOS / RHEL'},
+  {value:'arch',    label:'Arch Linux'},
+  {value:'windows', label:'Windows'},
+  {value:'macos',   label:'macOS'},
+  {value:'freebsd', label:'FreeBSD'},
+  {value:'other',   label:'Other'},
+];
+
+function addOsProfile(name='', type='ubuntu', isDefault=false) {
+  const idx = osProfileCount++;
+  const c   = document.getElementById('os-profiles-container');
+  const div = document.createElement('div');
+  div.id = 'os-profile-' + idx;
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 180px 130px 36px;gap:0.5rem;align-items:center;margin-bottom:0.5rem;';
+  const opts = OS_TYPES.map(t => `<option value="${t.value}"${type===t.value?' selected':''}>${t.label}</option>`).join('');
+  div.innerHTML = `
+    <input type="text" name="os_name" placeholder="OS Name (e.g. Ubuntu 24.04)" value="${escHtml(name)}">
+    <select name="os_type">${opts}</select>
+    <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.85rem;cursor:pointer;
+                  padding:0.45rem 0.6rem;border:1px solid var(--border);border-radius:var(--radius-md);
+                  background:var(--bg-elevated);color:var(--text-secondary);">
+      <input type="checkbox" name="os_default" value="${idx}"${isDefault?' checked':''}
+             style="width:16px;height:16px;accent-color:var(--accent-blue);">
+      Default
+    </label>
+    <button type="button" onclick="removeOsProfile(${idx})" class="btn btn-danger btn-sm" style="padding:0.4rem 0.6rem;">&#x2715;</button>`;
+  c.appendChild(div);
+}
+function removeOsProfile(idx) {
+  const el = document.getElementById('os-profile-' + idx);
+  if (el) el.remove();
+}
+function toggleOS() {
+  document.getElementById('osBody').classList.toggle('open');
+  document.getElementById('osToggle').classList.toggle('open');
+}
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Pre-fill existing OS profiles
+document.addEventListener('DOMContentLoaded', function() {
+  const existing = {{ data.os_profiles | tojson if data.os_profiles else '[]' }};
+  existing.forEach(p => addOsProfile(p.name, p.type, p.default));
+  if (existing.length > 0) {
+    document.getElementById('osToggle').classList.add('open');
+  }
+});
 </script>
 {% endblock %}

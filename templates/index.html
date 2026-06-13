@@ -12,48 +12,140 @@
     <h3>&#x1F514; Dashboard Update Available</h3>
     <span class="badge badge-blue">{{ update_notification.type }}</span>
   </div>
-  <p>
-    <strong>{{ update_notification.description }}</strong><br>
-    <span class="text-muted">Version {{ update_notification.version }}</span>
-  </p>
+  <p><strong>{{ update_notification.description }}</strong><br>
+     <span class="text-muted">Version {{ update_notification.version }}</span></p>
   <div class="btn-group">
     {% if is_admin %}
     <a class="btn btn-success btn-sm" href="/dashboard_version/update">&#x2B06; Update Now</a>
     {% endif %}
     <a class="btn btn-purple btn-sm" href="/dashboard_version/check">&#x1F504; Check Again</a>
     {% if update_notification.url %}
-    <a class="btn btn-secondary btn-sm" href="{{ update_notification.url }}" target="_blank">&#x1F517; View on GitHub</a>
+    <a class="btn btn-secondary btn-sm" href="{{ update_notification.url }}" target="_blank">&#x1F517; GitHub</a>
     {% endif %}
     <a class="btn btn-ghost btn-sm" href="/dashboard_version/dismiss">&#x2715; Dismiss</a>
   </div>
 </div>
 {% endif %}
 
-<!-- Quick Stats -->
-<div class="stat-grid">
-  <div class="stat-card">
-    <div class="stat-card-icon blue">&#x1F5A7;</div>
-    <div class="stat-card-value">&#x2014;</div>
-    <div class="stat-card-label">Managed Hosts</div>
+<!-- ── Quick Stats ─────────────────────────────────────────── -->
+<div class="stat-grid-v2">
+  <div class="stat-card-v2 blue">
+    <div class="stat-card-v2-value">{{ host_count }}</div>
+    <div class="stat-card-v2-label">&#x1F5A7; Managed Hosts</div>
+    {% if env_counts %}
+    <div class="stat-card-v2-sub">
+      {% for env, cnt in env_counts.items() %}{{ cnt }} {{ env }}{% if not loop.last %} · {% endif %}{% endfor %}
+    </div>
+    {% endif %}
   </div>
-  <div class="stat-card">
-    <div class="stat-card-icon green">&#x1F4BE;</div>
-    <div class="stat-card-value">&#x2014;</div>
-    <div class="stat-card-label">Disk Drives</div>
+  <div class="stat-card-v2 green">
+    <div class="stat-card-v2-value">{{ disk_count }}</div>
+    <div class="stat-card-v2-label">&#x1F4BE; Disk Drives</div>
+    <div class="stat-card-v2-sub">Tracked by Disk Tools</div>
   </div>
-  <div class="stat-card">
-    <div class="stat-card-icon purple">&#x1F504;</div>
-    <div class="stat-card-value">&#x2014;</div>
-    <div class="stat-card-label">Updates Run</div>
+  <div class="stat-card-v2 purple">
+    <div class="stat-card-v2-value">{{ update_count }}</div>
+    <div class="stat-card-v2-label">&#x1F504; Updates Run</div>
+    <div class="stat-card-v2-sub">Total in history</div>
   </div>
-  <div class="stat-card">
-    <div class="stat-card-icon amber">&#x1F465;</div>
-    <div class="stat-card-value">&#x2014;</div>
-    <div class="stat-card-label">Active Users</div>
+  <div class="stat-card-v2 amber">
+    <div class="stat-card-v2-value">{{ active_users }}</div>
+    <div class="stat-card-v2-label">&#x1F465; Active Users</div>
+    <div class="stat-card-v2-sub">With dashboard access</div>
   </div>
+  {% if tag_counts %}
+  <div class="stat-card-v2 cyan">
+    <div class="stat-card-v2-value">{{ tag_counts|length }}</div>
+    <div class="stat-card-v2-label">&#x1F3F7; Unique Tags</div>
+    <div class="stat-card-v2-sub">Across all hosts</div>
+  </div>
+  {% endif %}
 </div>
 
-<!-- Navigation Cards -->
+<!-- ── Fleet Overview ─────────────────────────────────────── -->
+{% if hosts %}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.5rem;">
+
+  <!-- Environment Breakdown -->
+  <div class="card" style="padding:1.1rem 1.25rem;">
+    <div class="card-header" style="margin-bottom:0.75rem;">
+      <h3>&#x1F30D; Environments</h3>
+    </div>
+    {% if env_counts %}
+    <div style="display:flex;flex-direction:column;gap:0.5rem;">
+      {% set total = host_count %}
+      {% for env, cnt in env_counts.items() %}
+      {% set env_slug = (env|lower).replace(' ','') %}
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <span class="env-badge env-{{ env_slug }}" style="min-width:90px;justify-content:center;">{{ env }}</span>
+        <div style="flex:1;background:var(--bg-elevated);border-radius:999px;height:6px;overflow:hidden;">
+          <div style="height:100%;border-radius:999px;background:var(--accent-blue);width:{{ (cnt/total*100)|int }}%;transition:width 0.5s;"></div>
+        </div>
+        <span style="font-size:0.8rem;color:var(--text-muted);min-width:20px;text-align:right;">{{ cnt }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted" style="font-size:0.85rem;">No environment data yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Tag Cloud -->
+  <div class="card" style="padding:1.1rem 1.25rem;">
+    <div class="card-header" style="margin-bottom:0.75rem;">
+      <h3>&#x1F3F7; Tag Cloud</h3>
+    </div>
+    {% if tag_counts %}
+    <div style="display:flex;flex-wrap:wrap;gap:0.4rem;">
+      {% for tag, cnt in (tag_counts|dictsort(by='value',reverse=true))[:15] %}
+      {% set slug = (tag|lower).replace(' ','-') %}
+      <a href="/hosts" class="tag-chip tag-chip-default tag-chip-{{ slug }}"
+         style="text-decoration:none;cursor:pointer;"
+         title="{{ cnt }} host{{ 's' if cnt != 1 else '' }}">
+        {{ tag }} <span style="opacity:0.7;font-size:0.68rem;">{{ cnt }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted" style="font-size:0.85rem;">No tags assigned yet. Add tags to your hosts for better organization.</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Recent Hosts -->
+<div class="card" style="margin-bottom:1.5rem;padding:1.1rem 1.25rem;">
+  <div class="card-header" style="margin-bottom:0.75rem;">
+    <h3>&#x1F5A7; Fleet Overview</h3>
+    <a class="btn btn-secondary btn-sm" href="/hosts">View All</a>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:0.4rem;">
+    {% for name, h in hosts.items() %}
+    {% set env_slug = (h.environment|lower).replace(' ','') %}
+    {% set crit_slug = h.criticality|lower %}
+    <div style="display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0.75rem;
+                background:var(--bg-elevated);border-radius:var(--radius-md);
+                border:1px solid var(--border);">
+      <div style="font-weight:600;font-size:0.9rem;min-width:120px;">{{ name }}</div>
+      <div style="flex:1;font-size:0.8rem;color:var(--text-muted);">
+        &#x1F4BB; {{ h.host }} &nbsp;·&nbsp; &#x1F464; {{ h.user }}
+        {% if h.location %}&nbsp;·&nbsp; &#x1F4CD; {{ h.location }}{% endif %}
+        {% if h.description %}&nbsp;·&nbsp; <span style="color:var(--text-secondary);">{{ h.description[:40] }}{% if h.description|length > 40 %}…{% endif %}</span>{% endif %}
+      </div>
+      <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
+        <span class="env-badge env-{{ env_slug }}">{{ h.environment }}</span>
+        <span class="crit-badge crit-{{ crit_slug }}">{{ h.criticality }}</span>
+        {% for tag in h.tags[:2] %}
+        <span class="tag-chip tag-chip-default">{{ tag }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Navigation Cards ───────────────────────────────────── -->
 <div class="host-grid">
 
   <div class="card">
@@ -85,9 +177,10 @@
       <h3>&#x1F5A7; Host Management</h3>
       <span class="badge badge-green">Network</span>
     </div>
-    <p>Add, edit, and remove managed hosts. Configure SSH keys, detect MAC addresses, and scan for IP changes.</p>
+    <p>Add, edit, and remove managed hosts. Assign tags, groups, descriptions and configure SSH keys.</p>
     <div class="btn-group" style="margin-top:0.75rem;">
       <a class="btn btn-primary btn-sm" href="/hosts">Manage Hosts</a>
+      <a class="btn btn-secondary btn-sm" href="/hosts/arp_table">ARP Table</a>
     </div>
   </div>
 
