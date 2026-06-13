@@ -239,7 +239,7 @@ The database is automatically created on first run and excluded from git (via `.
 
 ## Plugin Management
 
-The dashboard includes a powerful plugin system that allows you to extend disk management functionality with custom plugins.
+The dashboard includes a powerful plugin system that allows you to extend disk management functionality with custom plugins. You can create your own plugins to add new disk operations, custom reporting, or integrations with third-party tools.
 
 ### Accessing the Plugin Manager
 
@@ -651,6 +651,18 @@ To manually check for updates:
 - Configuration files are backed up to `/tmp` before updates
 - The system validates the current branch and commit SHA
 - Updates are fetched from the official GitHub repository only
+
+## Security Guidelines
+
+This repository and its tools are designed for administrative tasks. Because they perform system-level operations (such as disk formatting and package updates), security is paramount.
+
+### Core Security Principles
+
+1. **Authentication:** Always change the default credentials immediately. Use strong passwords and consider restricting access via a VPN or reverse proxy authentication layer.
+2. **Privilege Isolation:** The disk management tools require `sudo` or `root` privileges. Run this application only on trusted networks and dedicated management nodes.
+3. **Network Exposure:** **NEVER** expose this dashboard directly to the public internet. It must be placed behind a secure reverse proxy (e.g., Nginx, Traefik) configured with HTTPS/TLS.
+4. **Plugin Security:** Only install plugins from trusted sources. Plugins execute with the same privileges as the dashboard (potentially root).
+5. **Environment Variables:** Do not hardcode secrets. Use `.env` files and ensure they have restrictive file permissions (`chmod 600 .env`).
 
 ## Email Reporting
 
