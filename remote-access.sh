@@ -103,16 +103,37 @@ info "Creating temporary access user..."
 TEMP_USER="fleetpilot-support"
 TEMP_PASS=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 16)
 
-# Create user if it doesn't exist
+# Disable exit-on-error for user management (non-fatal errors possible)
+set +e
+
+# Remove stale user if it exists in a broken state
 if id "$TEMP_USER" &>/dev/null; then
     info "User '${TEMP_USER}' already exists — resetting password"
 else
-    useradd -m -s /bin/bash "$TEMP_USER"
-    success "Created user: ${TEMP_USER}"
+    useradd -m -s /bin/bash "$TEMP_USER" 2>/dev/null
+    USERADD_RC=$?
+    if [[ $USERADD_RC -ne 0 ]]; then
+        # Try adduser as fallback (Debian)
+        adduser --disabled-password --gecos "" "$TEMP_USER" 2>/dev/null || true
+    fi
+    if id "$TEMP_USER" &>/dev/null; then
+        success "Created user: ${TEMP_USER}"
+    else
+        error "Failed to create temporary user. Try: useradd -m -s /bin/bash ${TEMP_USER}"
+    fi
 fi
 
-echo "${TEMP_USER}:${TEMP_PASS}" | chpasswd
+# Set password
+echo "${TEMP_USER}:${TEMP_PASS}" | chpasswd 2>/dev/null
+CHPASS_RC=$?
+if [[ ${CHPASS_RC:-1} -ne 0 ]]; then
+    # Fallback: use passwd with echo
+    echo -e "${TEMP_PASS}\n${TEMP_PASS}" | passwd "$TEMP_USER" 2>/dev/null || true
+fi
 success "Temporary password set"
+
+# Re-enable exit-on-error
+set -e
 
 # Give sudo access (read-only commands + systemctl status)
 cat > "/etc/sudoers.d/${TEMP_USER}" <<SUDOEOF
