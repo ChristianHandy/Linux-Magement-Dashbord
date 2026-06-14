@@ -162,6 +162,10 @@
       <a class="btn btn-ghost btn-sm" href="/hosts/detect_mac/{{ name }}">&#x1F50D; MAC</a>
       {% endif %}
       <a class="btn btn-primary btn-sm" href="/update/{{ name }}">&#x2B06; Update</a>
+      {# Plugin hook: host_card_actions #}
+      {% if addon_mgr is defined %}
+        {{ addon_mgr.render_hooks('host_card_actions', host=h) | safe }}
+      {% endif %}
       <form method="post" action="/hosts/delete/{{ name }}" style="margin:0;"
             onsubmit="return confirm('Delete {{ name }}?')">
         <button type="submit" class="btn btn-danger btn-sm">&#x1F5D1;</button>

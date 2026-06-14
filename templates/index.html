@@ -145,6 +145,16 @@
 </div>
 {% endif %}
 
+<!-- ── Plugin Dashboard Widgets ─────────────────────────────── -->
+{% if addon_mgr is defined %}
+  {% set _plugin_widgets = addon_mgr.render_hooks('dashboard_widgets', hosts=hosts.values()|list, stats=stats) %}
+  {% if _plugin_widgets %}
+  <div style="margin-bottom:1.5rem">
+    {{ _plugin_widgets | safe }}
+  </div>
+  {% endif %}
+{% endif %}
+
 <!-- ── Navigation Cards ───────────────────────────────────── -->
 <div class="host-grid">
 

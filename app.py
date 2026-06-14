@@ -49,7 +49,10 @@ with app.app_context():
 # Template function for HTML extensions
 @app.context_processor
 def inject_hooks():
-    return dict(hook=lambda name, *args, **kwargs: addon_mgr.render_hooks(name, *args, **kwargs))
+    return dict(
+        hook=lambda name, *args, **kwargs: addon_mgr.render_hooks(name, *args, **kwargs),
+        addon_mgr=addon_mgr,
+    )
 
 # Template function for user context
 @app.context_processor
@@ -1517,6 +1520,195 @@ def set_language():
         session['lang'] = lang
     next_url = request.form.get('next') or request.args.get('next') or '/index'
     return redirect(next_url)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Plugin Manager Routes
+# ─────────────────────────────────────────────────────────────────────────────
+
+import re
+from pathlib import Path
+
+REMOTE_PLUGIN_REPO = "https://raw.githubusercontent.com/ChristianHandy/FleetPilot-Plugins/main/plugins.json"
+
+HOOK_NAMES_LIST = [
+    "dashboard_widgets", "host_card_actions", "host_detail_tabs",
+    "scanner_result_actions", "update_pre_hook", "update_post_hook",
+    "notification_hook", "sidebar_links", "navbar_badges",
+    "settings_panels", "device_buttons",
+]
+
+EXAMPLE_PLUGINS = [
+    {"name": "Example Dashboard Widget", "file": "example_dashboard_widget.py",
+     "description": "Adds a fleet-health summary widget to the Home dashboard. Demonstrates the dashboard_widget hook."},
+    {"name": "Slack Notification", "file": "example_slack_notify.py",
+     "description": "Sends a Slack webhook message after every update run. Requires SLACK_WEBHOOK_URL env var."},
+    {"name": "Host Ping Button", "file": "example_host_ping.py",
+     "description": "Adds a Ping button to every host card. Shows round-trip time via TCP probe."},
+]
+
+
+def _sanitize_addon_path(filename: str):
+    """Return a safe absolute path inside addons/ or None if invalid."""
+    base = Path("addons").resolve()
+    target = (base / filename).resolve()
+    try:
+        target.relative_to(base)
+        return target
+    except ValueError:
+        return None
+
+
+@app.route("/plugins")
+@login_required
+def plugin_manager():
+    """Plugin Manager overview page."""
+    plugins = addon_mgr.status
+    active_hooks = {}
+    for h in HOOK_NAMES_LIST:
+        count = len(addon_mgr.hooks.get(h, []))
+        if count:
+            active_hooks[h] = count
+    installed_names = [p["file"] for p in plugins]
+    hook_count = sum(len(v) for v in addon_mgr.hooks.values())
+    return render_template(
+        "plugin_manager.html",
+        plugins=plugins,
+        hook_names=HOOK_NAMES_LIST,
+        active_hooks=active_hooks,
+        installed_names=installed_names,
+        hook_count=hook_count,
+    )
+
+
+@app.route("/plugins/upload", methods=["POST"])
+@login_required
+def plugin_upload():
+    """Upload a .py plugin file into addons/."""
+    if not current_user_has_role("admin"):
+        flash("Only administrators can install plugins.", "error")
+        return redirect("/plugins")
+    f = request.files.get("plugin_file")
+    if not f or not f.filename.endswith(".py"):
+        flash("Please upload a valid .py file.", "error")
+        return redirect("/plugins")
+    fname = re.sub(r"[^a-zA-Z0-9_.\/]", "_", f.filename)
+    if not re.match(r"^[a-zA-Z0-9_]+\.py$", fname):
+        flash("Invalid filename.", "error")
+        return redirect("/plugins")
+    dest = _sanitize_addon_path(fname)
+    if dest is None:
+        flash("Invalid path.", "error")
+        return redirect("/plugins")
+    f.save(str(dest))
+    flash(f"Plugin '{fname}' uploaded. Restart FleetPilot to activate it.", "success")
+    return redirect("/plugins")
+
+
+@app.route("/plugins/uninstall/<plugin_file>", methods=["POST"])
+@login_required
+def plugin_uninstall(plugin_file):
+    """Delete a plugin file from addons/."""
+    if not current_user_has_role("admin"):
+        flash("Only administrators can uninstall plugins.", "error")
+        return redirect("/plugins")
+    if plugin_file == "plugin_manager.py":
+        flash("Cannot uninstall the built-in Plugin Manager.", "warning")
+        return redirect("/plugins")
+    if not re.match(r"^[a-zA-Z0-9_]+\.py$", plugin_file):
+        flash("Invalid filename.", "error")
+        return redirect("/plugins")
+    path = _sanitize_addon_path(plugin_file)
+    if path is None or not path.exists():
+        flash("Plugin not found.", "error")
+        return redirect("/plugins")
+    os.remove(path)
+    # Remove associated template if present
+    tpl = Path("templates/addons") / plugin_file.replace(".py", ".html")
+    if tpl.exists():
+        os.remove(tpl)
+    flash(f"Plugin '{plugin_file}' removed. Restart FleetPilot to deactivate it.", "success")
+    return redirect("/plugins")
+
+
+@app.route("/plugins/view/<plugin_file>")
+@login_required
+def plugin_view_source(plugin_file):
+    """Display the source code of an installed plugin."""
+    if not re.match(r"^[a-zA-Z0-9_]+\.py$", plugin_file):
+        flash("Invalid filename.", "error")
+        return redirect("/plugins")
+    path = _sanitize_addon_path(plugin_file)
+    if path is None or not path.exists():
+        flash("Plugin not found.", "error")
+        return redirect("/plugins")
+    source = path.read_text(encoding="utf-8")
+    return render_template(
+        "plugin_source.html",
+        filename=plugin_file,
+        source=source,
+    )
+
+
+@app.route("/plugins/docs")
+@login_required
+def plugin_docs():
+    """Plugin developer documentation page."""
+    return render_template("plugin_docs.html", examples=EXAMPLE_PLUGINS)
+
+
+@app.route("/plugins/repository.json")
+@login_required
+def plugin_repository_json():
+    """Proxy / cache the remote plugin repository JSON."""
+    import urllib.request
+    import urllib.error
+    try:
+        with urllib.request.urlopen(REMOTE_PLUGIN_REPO, timeout=5) as resp:
+            data = resp.read().decode("utf-8")
+        return app.response_class(data, mimetype="application/json")
+    except Exception:
+        return jsonify({"plugins": []})
+
+
+@app.route("/plugins/install/<plugin_id>", methods=["POST"])
+@login_required
+def plugin_install_remote(plugin_id):
+    """Install a plugin from the remote repository."""
+    if not current_user_has_role("admin"):
+        flash("Only administrators can install plugins.", "error")
+        return redirect("/plugins")
+    if not re.match(r"^[a-zA-Z0-9_]+$", plugin_id):
+        flash("Invalid plugin ID.", "error")
+        return redirect("/plugins")
+    import urllib.request
+    import urllib.error
+    try:
+        with urllib.request.urlopen(REMOTE_PLUGIN_REPO, timeout=10) as resp:
+            repo = json.loads(resp.read().decode("utf-8"))
+        plugin_info = next((p for p in repo.get("plugins", []) if p.get("id") == plugin_id), None)
+        if not plugin_info:
+            flash(f"Plugin '{plugin_id}' not found in repository.", "error")
+            return redirect("/plugins")
+        plugin_url = plugin_info.get("url", "")
+        if not plugin_url:
+            flash("Plugin URL missing.", "error")
+            return redirect("/plugins")
+        with urllib.request.urlopen(plugin_url, timeout=10) as resp:
+            code = resp.read().decode("utf-8")
+        fname = f"{plugin_id}.py"
+        dest = _sanitize_addon_path(fname)
+        if dest is None:
+            flash("Invalid path.", "error")
+            return redirect("/plugins")
+        if dest.exists():
+            flash(f"Plugin '{plugin_id}' is already installed.", "warning")
+            return redirect("/plugins")
+        dest.write_text(code, encoding="utf-8")
+        flash(f"Plugin '{plugin_id}' installed. Restart FleetPilot to activate it.", "success")
+    except Exception as exc:
+        flash(f"Install failed: {exc}", "error")
+    return redirect("/plugins")
+
 
 if __name__ == "__main__":
     # Initialize User Management database

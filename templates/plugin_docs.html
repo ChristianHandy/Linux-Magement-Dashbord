@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+{% block title %}Plugin Developer Docs — FleetPilot{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Plugin Developer Documentation</h1>
+    <p class="page-subtitle">Everything you need to build FleetPilot plugins</p>
+  </div>
+  <a href="/plugins" class="btn btn-secondary">← Back to Plugin Manager</a>
+</div>
+
+<div style="display:grid; grid-template-columns:220px 1fr; gap:2rem; align-items:start">
+
+  <!-- TOC -->
+  <div class="card" style="position:sticky; top:1rem">
+    <div class="card-body" style="padding:1rem">
+      <div style="font-size:0.8rem; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.75rem">Contents</div>
+      <nav style="display:flex; flex-direction:column; gap:0.35rem">
+        <a href="#overview" style="font-size:0.85rem; color:var(--text-secondary); text-decoration:none; padding:0.25rem 0.5rem; border-radius:4px">Overview</a>
+        <a href="#structure" style="font-size:0.85rem; color:var(--text-secondary); text-decoration:none; padding:0.25rem 0.5rem; border-radius:4px">Plugin Structure</a>
+        <a href="#hooks" style="font-size:0.85rem; color:var(--text-secondary); text-decoration:none; padding:0.25rem 0.5rem; border-radius:4px">Hook Reference</a>
+        <a href="#routes" style="font-size:0.85rem; color:var(--text-secondary); text-decoration:none; padding:0.25rem 0.5rem; border-radius:4px">Adding Routes</a>
+        <a href="#examples" style="font-size:0.85rem; color:var(--text-secondary); text-decoration:none; padding:0.25rem 0.5rem; border-radius:4px">Examples</a>
+        <a href="#security" style="font-size:0.85rem; color:var(--text-secondary); text-decoration:none; padding:0.25rem 0.5rem; border-radius:4px">Security</a>
+      </nav>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div style="min-width:0">
+
+    <section id="overview" class="card" style="margin-bottom:1.5rem">
+      <div class="card-body" style="padding:1.5rem">
+        <h2 style="margin:0 0 1rem; font-size:1.1rem; font-weight:600">Overview</h2>
+        <p style="color:var(--text-secondary); line-height:1.7">
+          FleetPilot plugins are plain Python files placed in the <code>addons/</code> directory.
+          They are loaded automatically at startup. A plugin can inject HTML into any part of the
+          dashboard, register Flask routes, run background threads, or react to system events
+          (like a completed update run).
+        </p>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1rem">
+          <div style="background:var(--bg-tertiary); padding:1rem; border-radius:8px">
+            <div style="font-weight:600; font-size:0.9rem; margin-bottom:0.5rem; color:var(--text-primary)">✅ What plugins CAN do</div>
+            <ul style="font-size:0.85rem; color:var(--text-secondary); margin:0; padding-left:1.25rem; line-height:1.8">
+              <li>Add widgets to the dashboard</li>
+              <li>Add buttons to host cards</li>
+              <li>Add tabs to host detail view</li>
+              <li>Add sidebar navigation links</li>
+              <li>React to update events</li>
+              <li>Add Flask routes / pages</li>
+              <li>Run background threads</li>
+              <li>Send external notifications</li>
+            </ul>
+          </div>
+          <div style="background:var(--bg-tertiary); padding:1rem; border-radius:8px">
+            <div style="font-weight:600; font-size:0.9rem; margin-bottom:0.5rem; color:var(--text-primary)">⚠️ Security notes</div>
+            <ul style="font-size:0.85rem; color:var(--text-secondary); margin:0; padding-left:1.25rem; line-height:1.8">
+              <li>Plugins run with full app privileges</li>
+              <li>Only install from trusted sources</li>
+              <li>Admin role required to install</li>
+              <li>Restart required after install</li>
+              <li>Never store secrets in plugin code</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="structure" class="card" style="margin-bottom:1.5rem">
+      <div class="card-body" style="padding:1.5rem">
+        <h2 style="margin:0 0 1rem; font-size:1.1rem; font-weight:600">Plugin Structure</h2>
+        <p style="color:var(--text-secondary); margin-bottom:1rem">Every plugin is a single <code>.py</code> file with two optional parts:</p>
+        <pre style="background:var(--bg-tertiary); padding:1.25rem; border-radius:8px; font-size:0.8rem; overflow:auto; color:var(--text-primary); line-height:1.7"># my_plugin.py
+# ─────────────────────────────────────────────────────────────────────────────
+# Part 1: addon_meta — describes the plugin and registers hooks
+# ─────────────────────────────────────────────────────────────────────────────
+addon_meta = {
+    # Required
+    "name":        "My Plugin",
+    "version":     "1.0.0",
+    "author":      "Your Name",
+    "description": "Short description shown in the Plugin Manager",
+    "scope":       "global",  # global | disks | hosts | dashboard | scanner
+
+    # Optional: hook registrations (see Hook Reference below)
+    "dashboard_widget": lambda hosts, stats: "&lt;div&gt;...&lt;/div&gt;",
+    "sidebar_link":     lambda: {"label": "My Page", "url": "/my_page", "icon": "🔧"},
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Part 2: register() — called once at startup with the Flask app and disk core
+# ─────────────────────────────────────────────────────────────────────────────
+def register(app, core):
+    """Optional. Use to add routes, start threads, etc."""
+    from flask import Blueprint
+    bp = Blueprint("my_plugin", __name__)
+
+    @bp.route("/my_page")
+    def my_page():
+        return "&lt;h1&gt;My Plugin Page&lt;/h1&gt;"
+
+    app.register_blueprint(bp)
+    print("[my_plugin] loaded")</pre>
+      </div>
+    </section>
+
+    <section id="hooks" class="card" style="margin-bottom:1.5rem">
+      <div class="card-body" style="padding:1.5rem">
+        <h2 style="margin:0 0 1rem; font-size:1.1rem; font-weight:600">Hook Reference</h2>
+        <div style="overflow:auto">
+          <table style="width:100%; border-collapse:collapse; font-size:0.85rem">
+            <thead>
+              <tr style="border-bottom:2px solid var(--border-color)">
+                <th style="text-align:left; padding:0.5rem 0.75rem; color:var(--text-muted); font-weight:600">Hook Key</th>
+                <th style="text-align:left; padding:0.5rem 0.75rem; color:var(--text-muted); font-weight:600">Arguments</th>
+                <th style="text-align:left; padding:0.5rem 0.75rem; color:var(--text-muted); font-weight:600">Returns</th>
+                <th style="text-align:left; padding:0.5rem 0.75rem; color:var(--text-muted); font-weight:600">Injected into</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% set hooks = [
+                ("dashboard_widget", "(hosts: list, stats: dict)", "HTML string", "Home dashboard"),
+                ("host_card_action", "(host: dict)", "HTML string", "Each host card"),
+                ("host_detail_tab", "(host: dict)", '{"tab_label": str, "tab_content": HTML}', "Host detail view"),
+                ("scanner_action", "(ip: str, info: dict)", "HTML string", "Scanner results"),
+                ("update_pre", "(host: dict)", "None", "Before each update"),
+                ("update_post", "(host: dict, result: dict)", "None", "After each update"),
+                ("notification", "(event: str, data: dict)", "None", "Any system event"),
+                ("sidebar_link", "()", '{"label": str, "url": str, "icon": str}', "Sidebar navigation"),
+                ("navbar_badge", "()", "HTML string", "Top navigation bar"),
+                ("settings_panel", "()", "HTML string", "Settings page"),
+                ("device_buttons", "(device: str)", "HTML string", "Disk tool device list (legacy)"),
+              ] %}
+              {% for hook, args, returns, where in hooks %}
+              <tr style="border-bottom:1px solid var(--border-color)">
+                <td style="padding:0.6rem 0.75rem; font-family:monospace; color:var(--accent-primary)">{{ hook }}</td>
+                <td style="padding:0.6rem 0.75rem; color:var(--text-secondary); font-family:monospace; font-size:0.78rem">{{ args }}</td>
+                <td style="padding:0.6rem 0.75rem; color:var(--text-secondary)">{{ returns }}</td>
+                <td style="padding:0.6rem 0.75rem; color:var(--text-muted)">{{ where }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="routes" class="card" style="margin-bottom:1.5rem">
+      <div class="card-body" style="padding:1.5rem">
+        <h2 style="margin:0 0 1rem; font-size:1.1rem; font-weight:600">Adding Flask Routes</h2>
+        <pre style="background:var(--bg-tertiary); padding:1.25rem; border-radius:8px; font-size:0.8rem; overflow:auto; color:var(--text-primary); line-height:1.7">def register(app, core):
+    from flask import Blueprint, render_template, jsonify, request, session
+    from functools import wraps
+
+    bp = Blueprint("my_plugin", __name__, url_prefix="/my_plugin")
+
+    # Re-use the existing login_required decorator
+    def login_required(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if not session.get("user_id"):
+                from flask import redirect, url_for
+                return redirect(url_for("login"))
+            return f(*args, **kwargs)
+        return decorated
+
+    @bp.route("/")
+    @login_required
+    def index():
+        return render_template("addons/my_plugin.html")
+
+    @bp.route("/api/data")
+    @login_required
+    def api_data():
+        return jsonify({"status": "ok", "data": []})
+
+    app.register_blueprint(bp)</pre>
+      </div>
+    </section>
+
+    <section id="examples" class="card" style="margin-bottom:1.5rem">
+      <div class="card-body" style="padding:1.5rem">
+        <h2 style="margin:0 0 1rem; font-size:1.1rem; font-weight:600">Example Plugins</h2>
+        <p style="color:var(--text-secondary); margin-bottom:1rem">These example plugins are included with FleetPilot:</p>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem">
+          {% for ex in examples %}
+          <div style="background:var(--bg-tertiary); padding:1rem; border-radius:8px">
+            <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary); margin-bottom:0.25rem">{{ ex.name }}</div>
+            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem; font-family:monospace">addons/{{ ex.file }}</div>
+            <p style="font-size:0.82rem; color:var(--text-secondary); margin:0">{{ ex.description }}</p>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <section id="security" class="card" style="margin-bottom:1.5rem; border-left:4px solid #f59e0b">
+      <div class="card-body" style="padding:1.5rem">
+        <h2 style="margin:0 0 1rem; font-size:1.1rem; font-weight:600; color:#f59e0b">Security Guidelines</h2>
+        <ul style="color:var(--text-secondary); line-height:1.8; margin:0; padding-left:1.25rem; font-size:0.9rem">
+          <li><strong>Plugins run with full application privileges</strong> — treat them like application code, not user content.</li>
+          <li>Only install plugins from sources you trust completely.</li>
+          <li>Never hardcode API keys, passwords, or tokens in plugin files. Use environment variables instead.</li>
+          <li>If your plugin makes outbound HTTP requests, validate all URLs and handle errors gracefully.</li>
+          <li>Sanitize any user input before using it in shell commands or SQL queries.</li>
+          <li>Use Flask's <code>login_required</code> pattern on all routes your plugin adds.</li>
+        </ul>
+      </div>
+    </section>
+
+  </div>
+</div>
+{% endblock %}

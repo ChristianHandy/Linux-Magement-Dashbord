@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}{{ filename }} — Plugin Source — FleetPilot{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Plugin Source</h1>
+    <p class="page-subtitle" style="font-family:monospace">addons/{{ filename }}</p>
+  </div>
+  <a href="/plugins" class="btn btn-secondary">← Back to Plugin Manager</a>
+</div>
+
+<div class="card">
+  <div class="card-body" style="padding:0">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:0.75rem 1.25rem; border-bottom:1px solid var(--border-color)">
+      <span style="font-size:0.85rem; color:var(--text-muted); font-family:monospace">{{ filename }}</span>
+      <button onclick="copySource()" class="btn btn-sm btn-secondary">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="margin-right:4px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copy
+      </button>
+    </div>
+    <pre id="sourceCode" style="margin:0; padding:1.5rem; overflow:auto; font-size:0.82rem; line-height:1.7; color:var(--text-primary); background:var(--bg-tertiary); border-radius:0 0 var(--radius-lg) var(--radius-lg); max-height:75vh">{{ source | e }}</pre>
+  </div>
+</div>
+
+<script>
+function copySource() {
+  const code = document.getElementById('sourceCode').textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = event.target.closest('button');
+    const orig = btn.innerHTML;
+    btn.textContent = '✓ Copied!';
+    btn.style.color = '#10b981';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; }, 2000);
+  });
+}
+</script>
+{% endblock %}

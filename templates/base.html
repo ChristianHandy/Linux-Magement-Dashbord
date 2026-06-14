@@ -64,6 +64,22 @@
         <span class="sidebar-icon">&#x2709;&#xFE0F;</span> {{ _('Email Config') }}
       </a>
 
+      {% if is_admin is defined and is_admin %}
+      <a class="sidebar-link {% if request.path.startswith('/plugins') %}active{% endif %}" href="/plugins">
+        <span class="sidebar-icon">&#x1F9E9;</span> Plugin Manager
+        <span class="badge badge-blue" style="margin-left:auto;font-size:0.65rem;padding:0.1rem 0.4rem;">Admin</span>
+      </a>
+      {% endif %}
+
+      {# Dynamic sidebar links from plugins #}
+      {% if addon_mgr is defined %}
+        {% for sl in addon_mgr.get_sidebar_links() %}
+        <a class="sidebar-link {% if request.path.startswith(sl.url) %}active{% endif %}" href="{{ sl.url }}">
+          <span class="sidebar-icon">{{ sl.icon|default('&#x1F527;') }}</span> {{ sl.label }}
+        </a>
+        {% endfor %}
+      {% endif %}
+
       <span class="sidebar-section-label">{{ _('Account') }}</span>
       <a class="sidebar-link {% if request.path.startswith('/users/profile') %}active{% endif %}" href="/users/profile">
         <span class="sidebar-icon">&#x1F464;</span> {{ _('My Profile') }}
