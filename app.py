@@ -37,6 +37,15 @@ addon_mgr = AddonManager(app, disktool_core)
 app.addon_mgr = addon_mgr
 addon_mgr.load_addons()
 
+# ── Database initialisation ───────────────────────────────────────────────────
+# Runs at module import time so both Gunicorn workers and direct python3
+# invocations initialise the database before any request is handled.
+with app.app_context():
+    user_management.init_user_db()
+    if user_management.migrate_env_user_to_db():
+        print(f"INFO: Migrated env-var user '{USERNAME}' to database.")
+    disktool_core.init_db()
+
 # Template function for HTML extensions
 @app.context_processor
 def inject_hooks():
