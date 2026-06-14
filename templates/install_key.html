@@ -8,7 +8,26 @@
 
 <div style="max-width:560px;">
 
-  {% if error %}
+  {% if name is none and hosts is defined %}
+  <div class="card">
+    <div class="card-header">
+      <h3>&#x1F511; Install SSH Key — Select Host</h3>
+    </div>
+    <p>Select a host to install the SSH public key for passwordless authentication.</p>
+    {% if hosts %}
+    <ul style="list-style:none;padding:0;">
+      {% for hname, hdata in hosts.items() %}
+      <li style="margin-bottom:0.5rem;">
+        <a class="btn btn-primary btn-sm" href="/hosts/install_key/{{ hname }}">&#x1F511; {{ hname }} <small>({{ hdata.host }})</small></a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted">No hosts configured. <a href="/hosts">Add a host first.</a></p>
+    {% endif %}
+    <a class="btn btn-ghost btn-sm" href="/hosts" style="margin-top:0.75rem;">&#x2190; Back to Hosts</a>
+  </div>
+  {% elif error %}
   <div class="card card-red">
     <div class="card-header">
       <h3>&#x274C; Installation Failed</h3>

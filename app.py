@@ -772,6 +772,7 @@ def delete_host(name):
 
 # Install SSH public key on remote host using password auth
 @app.route("/hosts/install_key/<name>", methods=["GET", "POST"])
+@app.route("/install_key", methods=["GET", "POST"], defaults={"name": None})
 @login_required
 def install_key(name):
     # Require operator or admin role to install keys
@@ -780,6 +781,9 @@ def install_key(name):
         return redirect(url_for('manage_hosts'))
     
     hosts = load_hosts()
+    if name is None:
+        # Show host selection page when accessed without a specific host
+        return render_template("install_key.html", name=None, hosts=hosts, error=None, success=False)
     if name not in hosts:
         return redirect("/hosts")
     
@@ -1225,8 +1229,8 @@ def users_edit(uid):
     
     user = user_management.get_user_by_id(uid)
     if not user:
-        flash('User not found.')
-        return redirect(url_for('users_list'))
+        from flask import abort
+        abort(404)
     
     if request.method == "POST":
         username = request.form.get("username", "").strip()
