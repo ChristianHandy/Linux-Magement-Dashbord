@@ -5,7 +5,10 @@ Optimised for a typical home-lab / small-enterprise server.
 import multiprocessing, os
 
 # ── Binding ───────────────────────────────────────────────────────────────────
-bind        = os.environ.get("GUNICORN_BIND", "0.0.0.0:5000")
+# Respect the SERVER_IP env var set in /opt/fleetpilot/.env, fallback to 0.0.0.0
+_server_ip = os.environ.get("SERVER_IP", "0.0.0.0")
+_app_port  = os.environ.get("APP_PORT", "5000")
+bind        = os.environ.get("GUNICORN_BIND", f"{_server_ip}:{_app_port}")
 backlog     = 2048
 
 # ── Workers ───────────────────────────────────────────────────────────────────
@@ -22,8 +25,9 @@ keepalive       = 5            # seconds to keep idle connections open
 graceful_timeout = 30
 
 # ── Logging ───────────────────────────────────────────────────────────────────
-accesslog   = "/var/log/fleetpilot/access.log"
-errorlog    = "/var/log/fleetpilot/error.log"
+# Use "-" to log to stdout/stderr (captured by systemd journal)
+accesslog   = "-"
+errorlog    = "-"
 loglevel    = "warning"        # reduce log noise in production
 access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s %(D)sµs'
 
