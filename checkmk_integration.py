@@ -112,9 +112,18 @@ def check_disk_smart(smart_manager) -> list[str]:
     """Generate CheckMK lines for SMART disk health."""
     lines = []
     try:
-        disks = smart_manager.get_all_disks()
+        raw = smart_manager.get_all_disks()
     except Exception:
         return [_fmt_line(3, "FleetPilot SMART", "-", "SMART manager unavailable")]
+
+    # get_all_disks() may return a list or a dict depending on version
+    if isinstance(raw, dict):
+        disks = raw  # {disk_id: disk_data}
+    elif isinstance(raw, list):
+        # Convert list to dict keyed by device path or index
+        disks = {d.get("device", str(i)): d for i, d in enumerate(raw)}
+    else:
+        disks = {}
 
     for disk_id, disk in disks.items():
         device = disk.get("device", disk_id)
@@ -337,7 +346,13 @@ def build_host_piggyback(host_name: str, host_data: dict,
     # SMART disks for this host
     if smart_manager:
         try:
-            all_disks = smart_manager.get_all_disks()
+            raw_disks = smart_manager.get_all_disks()
+            if isinstance(raw_disks, dict):
+                all_disks = raw_disks
+            elif isinstance(raw_disks, list):
+                all_disks = {d.get("device", str(i)): d for i, d in enumerate(raw_disks)}
+            else:
+                all_disks = {}
             host_disks = {k: v for k, v in all_disks.items()
                           if v.get("source_host") == host_name or v.get("source") == host_name}
             for disk_id, disk in host_disks.items():
@@ -404,7 +419,13 @@ def build_status_json(hosts: dict, smart_manager=None,
     failed_disks = []
     if smart_manager:
         try:
-            all_disks = smart_manager.get_all_disks()
+            raw_disks = smart_manager.get_all_disks()
+            if isinstance(raw_disks, dict):
+                all_disks = raw_disks
+            elif isinstance(raw_disks, list):
+                all_disks = {d.get("device", str(i)): d for i, d in enumerate(raw_disks)}
+            else:
+                all_disks = {}
             health_counts = {"GOOD": 0, "WARNING": 0, "CRITICAL": 0, "FAILED": 0, "UNKNOWN": 0}
             for disk_id, disk in all_disks.items():
                 health = disk.get("health", "UNKNOWN")
