@@ -48,6 +48,15 @@ def init_user_db():
         
         CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles(user_id);
         CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role_id);
+
+        -- Per-user dashboard layout preferences (widget order, visibility, size)
+        CREATE TABLE IF NOT EXISTS user_dashboard_layouts(
+          user_id   INTEGER NOT NULL,
+          layout    TEXT    NOT NULL DEFAULT '{}',
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (user_id),
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
         """)
         
         # Create default roles if they don't exist
@@ -328,3 +337,87 @@ def role_required(*required_roles):
 def admin_required(f):
     """Decorator to require admin role."""
     return role_required('admin')(f)
+
+# ── Dashboard Layout Preferences ─────────────────────────────────────────────
+
+import json as _json
+
+# Default widget configuration — defines all available widgets, their default
+# order, size, and visibility.  Each entry is keyed by a stable widget ID.
+DEFAULT_DASHBOARD_LAYOUT = {
+    "widgets": [
+        {"id": "stat_grid",       "title": "Quick Stats",         "visible": True,  "order": 0,  "size": "full"},
+        {"id": "fleet_overview",  "title": "Fleet Overview",      "visible": True,  "order": 1,  "size": "full"},
+        {"id": "vm_summary",      "title": "VM Controllers",      "visible": True,  "order": 2,  "size": "half"},
+        {"id": "storage_summary", "title": "Storage Controllers", "visible": True,  "order": 3,  "size": "half"},
+        {"id": "smart_summary",   "title": "SMART / Disk Health", "visible": True,  "order": 4,  "size": "half"},
+        {"id": "env_breakdown",   "title": "Environments",        "visible": True,  "order": 5,  "size": "half"},
+        {"id": "tag_cloud",       "title": "Tag Cloud",           "visible": True,  "order": 6,  "size": "half"},
+        {"id": "recent_updates",  "title": "Recent Updates",      "visible": True,  "order": 7,  "size": "half"},
+        {"id": "nav_cards",       "title": "Navigation Cards",    "visible": True,  "order": 8,  "size": "full"},
+        {"id": "plugin_widgets",  "title": "Plugin Widgets",      "visible": True,  "order": 9,  "size": "full"},
+    ]
+}
+
+
+def get_dashboard_layout(user_id: int) -> dict:
+    """Return the dashboard layout for *user_id*, falling back to the default."""
+    with get_user_db() as db:
+        row = db.execute(
+            'SELECT layout FROM user_dashboard_layouts WHERE user_id = ?',
+            (user_id,)
+        ).fetchone()
+    if not row:
+        return _json.loads(_json.dumps(DEFAULT_DASHBOARD_LAYOUT))  # deep copy
+    try:
+        stored = _json.loads(row['layout'])
+    except Exception:
+        return _json.loads(_json.dumps(DEFAULT_DASHBOARD_LAYOUT))
+
+    # Merge: add any new default widgets that the stored layout doesn't have yet
+    stored_ids = {w['id'] for w in stored.get('widgets', [])}
+    for default_w in DEFAULT_DASHBOARD_LAYOUT['widgets']:
+        if default_w['id'] not in stored_ids:
+            stored.setdefault('widgets', []).append(_json.loads(_json.dumps(default_w)))
+    return stored
+
+
+def save_dashboard_layout(user_id: int, layout: dict) -> None:
+    """Persist *layout* for *user_id* in the database."""
+    # Basic validation: must have a 'widgets' list
+    if not isinstance(layout, dict) or not isinstance(layout.get('widgets'), list):
+        raise ValueError("Invalid layout structure")
+    # Sanitise each widget entry
+    clean_widgets = []
+    allowed_sizes = {"full", "half", "third", "two-thirds"}
+    for w in layout['widgets']:
+        if not isinstance(w, dict) or 'id' not in w:
+            continue
+        clean_widgets.append({
+            "id":      str(w['id'])[:64],
+            "title":   str(w.get('title', ''))[:128],
+            "visible": bool(w.get('visible', True)),
+            "order":   int(w.get('order', 0)),
+            "size":    w.get('size', 'full') if w.get('size') in allowed_sizes else 'full',
+        })
+    layout['widgets'] = clean_widgets
+    payload = _json.dumps(layout)
+    with get_user_db() as db:
+        db.execute(
+            """INSERT INTO user_dashboard_layouts(user_id, layout, updated_at)
+               VALUES (?, ?, CURRENT_TIMESTAMP)
+               ON CONFLICT(user_id) DO UPDATE SET
+                 layout     = excluded.layout,
+                 updated_at = excluded.updated_at""",
+            (user_id, payload)
+        )
+        db.commit()
+
+
+def reset_dashboard_layout(user_id: int) -> None:
+    """Delete the stored layout for *user_id* so the default is used again."""
+    with get_user_db() as db:
+        db.execute(
+            'DELETE FROM user_dashboard_layouts WHERE user_id = ?', (user_id,)
+        )
+        db.commit()

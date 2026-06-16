@@ -157,10 +157,27 @@ def get_events(limit: int = 100) -> List[Dict]:
 
 # ── HTTP helper ───────────────────────────────────────────────────────────────
 
+import time as _time_mod
+
+# Transient network errors that are safe to retry
+_RETRYABLE_ERRORS = (TimeoutError, ConnectionResetError, ConnectionRefusedError)
+
+
 def _http(method: str, url: str, headers: Dict = None,
           body: Any = None, verify_ssl: bool = False,
-          timeout: int = 10) -> Dict:
-    """Minimal HTTP client using stdlib only."""
+          timeout: int = 10, retries: int = 3, backoff: float = 1.0) -> Dict:
+    """Minimal HTTP client using stdlib only.
+
+    Automatically retries on transient network errors (timeout, connection
+    reset, connection refused) with exponential back-off.  HTTP-level errors
+    (4xx / 5xx) are *not* retried because they indicate a server-side problem.
+
+    Args:
+        retries:  Maximum number of *additional* attempts after the first
+                  failure (default 3 → up to 4 total attempts).
+        backoff:  Base delay in seconds between retries; doubles each attempt
+                  (1 s → 2 s → 4 s by default).
+    """
     ctx = ssl.create_default_context()
     if not verify_ssl:
         ctx.check_hostname = False
@@ -179,18 +196,43 @@ def _http(method: str, url: str, headers: Dict = None,
     for k, v in (headers or {}).items():
         req.add_header(k, v)
 
-    try:
-        with urllib.request.urlopen(req, context=ctx, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", errors="replace")
-            try:
-                return {"ok": True, "status": resp.status, "data": json.loads(raw)}
-            except json.JSONDecodeError:
-                return {"ok": True, "status": resp.status, "data": raw}
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", errors="replace")
-        return {"ok": False, "status": e.code, "error": raw}
-    except Exception as exc:
-        return {"ok": False, "status": 0, "error": str(exc)}
+    last_error: str = ""
+    attempt = 0
+    while attempt <= retries:
+        try:
+            with urllib.request.urlopen(req, context=ctx, timeout=timeout) as resp:
+                raw = resp.read().decode("utf-8", errors="replace")
+                try:
+                    return {"ok": True, "status": resp.status, "data": json.loads(raw)}
+                except json.JSONDecodeError:
+                    return {"ok": True, "status": resp.status, "data": raw}
+        except urllib.error.HTTPError as e:
+            # HTTP errors are definitive — do not retry
+            raw = e.read().decode("utf-8", errors="replace")
+            return {"ok": False, "status": e.code, "error": raw}
+        except Exception as exc:
+            last_error = str(exc)
+            # Only retry on transient network/timeout errors
+            is_transient = (
+                isinstance(exc, _RETRYABLE_ERRORS)
+                or "timed out" in last_error.lower()
+                or "connection" in last_error.lower()
+                or "reset" in last_error.lower()
+            )
+            if is_transient and attempt < retries:
+                delay = backoff * (2 ** attempt)
+                logger.warning(
+                    "_http %s %s — transient error (attempt %d/%d): %s. "
+                    "Retrying in %.1fs…",
+                    method, url, attempt + 1, retries + 1, last_error, delay
+                )
+                _time_mod.sleep(delay)
+                attempt += 1
+                continue
+            # Non-transient error or retries exhausted
+            break
+
+    return {"ok": False, "status": 0, "error": last_error}
 
 
 # ══════════════════════════════════════════════════════════════════════════════

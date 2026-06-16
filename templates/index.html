@@ -4,8 +4,162 @@
 {% block page_icon %}&#x1F3E0;{% endblock %}
 {% block page_title %}{{ _('Home') }}{% endblock %}
 
+{% block head %}
+<style>
+/* ── Dashboard Customization ─────────────────────────────────────────────── */
+.dash-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+.dash-toolbar-title {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-right: auto;
+}
+.dash-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+}
+.dash-edit-btn:hover { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+.dash-edit-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+.dash-edit-btn.danger:hover { background: #e53e3e; color: #fff; border-color: #e53e3e; }
+
+/* Widget wrapper */
+.dash-widget {
+  position: relative;
+  transition: opacity 0.2s;
+}
+.dash-widget.hidden-widget { display: none; }
+.dash-widget.edit-mode { cursor: grab; }
+.dash-widget.edit-mode:active { cursor: grabbing; }
+.dash-widget.drag-over { outline: 2px dashed var(--accent-blue); border-radius: var(--radius-md); }
+
+/* Edit-mode overlay on each widget */
+.widget-controls {
+  display: none;
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 10;
+  gap: 0.3rem;
+}
+.edit-mode .widget-controls { display: flex; }
+.widget-ctrl-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s;
+}
+.widget-ctrl-btn:hover { transform: scale(1.15); }
+.widget-ctrl-hide { background: #e53e3e; color: #fff; }
+.widget-ctrl-drag { background: var(--bg-elevated); color: var(--text-secondary); border: 1px solid var(--border); cursor: grab; }
+
+/* Drag handle indicator */
+.edit-mode .dash-widget::before {
+  content: '⠿';
+  position: absolute;
+  top: 0.5rem;
+  left: 0.75rem;
+  font-size: 1.1rem;
+  color: var(--accent-blue);
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Hidden-widget panel in edit mode */
+.hidden-widgets-panel {
+  display: none;
+  background: var(--bg-elevated);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+.hidden-widgets-panel.visible { display: block; }
+.hidden-widget-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin: 0.25rem;
+}
+.hidden-widget-chip:hover { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+
+/* Size toggle */
+.widget-size-toggle {
+  display: none;
+  gap: 0.2rem;
+  margin-top: 0.3rem;
+}
+.edit-mode .widget-size-toggle { display: flex; }
+.size-btn {
+  padding: 0.15rem 0.5rem;
+  font-size: 0.7rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  cursor: pointer;
+  color: var(--text-muted);
+}
+.size-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+
+/* Two-column grid for half-width widgets */
+.dash-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+@media (max-width: 768px) { .dash-grid-2col { grid-template-columns: 1fr; } }
+
+/* Stat grid */
+.stat-grid-v2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 
+{# Build a lookup from widget id → widget config #}
+{% set wmap = {} %}
+{% for w in dashboard_layout.widgets %}
+  {% set _ = wmap.update({w.id: w}) %}
+{% endfor %}
+
+{# Sort widgets by order #}
+{% set sorted_widgets = dashboard_layout.widgets | sort(attribute='order') %}
+
+<!-- ── Update Notification ──────────────────────────────────────────────── -->
 {% if update_notification %}
 <div class="card card-blue" style="margin-bottom:1.5rem;">
   <div class="card-header">
@@ -27,47 +181,256 @@
 </div>
 {% endif %}
 
-<!-- ── Quick Stats ─────────────────────────────────────────── -->
-<div class="stat-grid-v2">
-  <div class="stat-card-v2 blue">
-    <div class="stat-card-v2-value">{{ host_count }}</div>
-    <div class="stat-card-v2-label">&#x1F5A7; {{ _('Managed Hosts') }}</div>
-    {% if env_counts %}
-    <div class="stat-card-v2-sub">
-      {% for env, cnt in env_counts.items() %}{{ cnt }} {{ env }}{% if not loop.last %} · {% endif %}{% endfor %}
+<!-- ── Customization Toolbar ─────────────────────────────────────────────── -->
+<div class="dash-toolbar" id="dashToolbar">
+  <span class="dash-toolbar-title" id="dashToolbarHint"></span>
+  <button class="dash-edit-btn" id="btnEditMode" onclick="toggleEditMode()">
+    &#x270F;&#xFE0F; {{ _('Customize') }}
+  </button>
+  <button class="dash-edit-btn danger" id="btnReset" onclick="resetLayout()" style="display:none;">
+    &#x21BA; {{ _('Reset to Default') }}
+  </button>
+  <button class="dash-edit-btn" id="btnSave" onclick="saveLayout()" style="display:none;background:var(--accent-green,#38a169);color:#fff;border-color:var(--accent-green,#38a169);">
+    &#x1F4BE; {{ _('Save Layout') }}
+  </button>
+</div>
+
+<!-- ── Hidden Widgets Panel ──────────────────────────────────────────────── -->
+<div class="hidden-widgets-panel" id="hiddenWidgetsPanel">
+  <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.5rem;">
+    &#x1F441; {{ _('Hidden widgets — click to show') }}:
+  </div>
+  <div id="hiddenWidgetChips"></div>
+</div>
+
+<!-- ── Widget Container ───────────────────────────────────────────────────── -->
+<div id="dashboardContainer">
+
+{% for w in sorted_widgets %}
+{% set wid = w.id %}
+
+{# ── STAT GRID ── #}
+{% if wid == 'stat_grid' %}
+<div class="dash-widget{% if not w.visible %} hidden-widget{% endif %}"
+     data-widget-id="stat_grid" data-widget-title="{{ _('Quick Stats') }}" data-size="{{ w.size }}">
+  <div class="widget-controls">
+    <button class="widget-ctrl-btn widget-ctrl-hide" title="{{ _('Hide') }}" onclick="hideWidget('stat_grid')">&#x2715;</button>
+  </div>
+  <div class="stat-grid-v2">
+    <div class="stat-card-v2 blue">
+      <div class="stat-card-v2-value">{{ host_count }}</div>
+      <div class="stat-card-v2-label">&#x1F5A7; {{ _('Managed Hosts') }}</div>
+      {% if env_counts %}
+      <div class="stat-card-v2-sub">
+        {% for env, cnt in env_counts.items() %}{{ cnt }} {{ env }}{% if not loop.last %} · {% endif %}{% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="stat-card-v2 green">
+      <div class="stat-card-v2-value">{{ disk_count }}</div>
+      <div class="stat-card-v2-label">&#x1F4BE; {{ _('Disk Drives') }}</div>
+      <div class="stat-card-v2-sub">{{ _('Tracked by Disk Tools') }}</div>
+    </div>
+    <div class="stat-card-v2 purple">
+      <div class="stat-card-v2-value">{{ update_count }}</div>
+      <div class="stat-card-v2-label">&#x1F504; {{ _('Updates Run') }}</div>
+      <div class="stat-card-v2-sub">{{ _('Total in history') }}</div>
+    </div>
+    <div class="stat-card-v2 amber">
+      <div class="stat-card-v2-value">{{ active_users }}</div>
+      <div class="stat-card-v2-label">&#x1F465; {{ _('Active Users') }}</div>
+      <div class="stat-card-v2-sub">{{ _('With dashboard access') }}</div>
+    </div>
+    {% if vm_endpoints %}
+    <div class="stat-card-v2 cyan">
+      <div class="stat-card-v2-value">{{ vm_endpoints|length }}</div>
+      <div class="stat-card-v2-label">&#x1F5A5; VM Controllers</div>
+      <div class="stat-card-v2-sub">{{ _('Configured') }}</div>
+    </div>
+    {% endif %}
+    {% if storage_endpoints %}
+    <div class="stat-card-v2" style="border-color:var(--accent-orange,#dd6b20);">
+      <div class="stat-card-v2-value">{{ storage_endpoints|length }}</div>
+      <div class="stat-card-v2-label">&#x1F5C4; Storage Controllers</div>
+      <div class="stat-card-v2-sub">{{ _('Configured') }}</div>
+    </div>
+    {% endif %}
+    {% if tag_counts %}
+    <div class="stat-card-v2 cyan">
+      <div class="stat-card-v2-value">{{ tag_counts|length }}</div>
+      <div class="stat-card-v2-label">&#x1F3F7; {{ _('Unique Tags') }}</div>
+      <div class="stat-card-v2-sub">{{ _('Across all hosts') }}</div>
     </div>
     {% endif %}
   </div>
-  <div class="stat-card-v2 green">
-    <div class="stat-card-v2-value">{{ disk_count }}</div>
-    <div class="stat-card-v2-label">&#x1F4BE; {{ _('Disk Drives') }}</div>
-    <div class="stat-card-v2-sub">{{ _('Tracked by Disk Tools') }}</div>
-  </div>
-  <div class="stat-card-v2 purple">
-    <div class="stat-card-v2-value">{{ update_count }}</div>
-    <div class="stat-card-v2-label">&#x1F504; {{ _('Updates Run') }}</div>
-    <div class="stat-card-v2-sub">{{ _('Total in history') }}</div>
-  </div>
-  <div class="stat-card-v2 amber">
-    <div class="stat-card-v2-value">{{ active_users }}</div>
-    <div class="stat-card-v2-label">&#x1F465; {{ _('Active Users') }}</div>
-    <div class="stat-card-v2-sub">{{ _('With dashboard access') }}</div>
-  </div>
-  {% if tag_counts %}
-  <div class="stat-card-v2 cyan">
-    <div class="stat-card-v2-value">{{ tag_counts|length }}</div>
-    <div class="stat-card-v2-label">&#x1F3F7; {{ _('Unique Tags') }}</div>
-    <div class="stat-card-v2-sub">{{ _('Across all hosts') }}</div>
-  </div>
-  {% endif %}
 </div>
+{% endif %}
 
-<!-- ── Fleet Overview ─────────────────────────────────────── -->
-{% if hosts %}
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.5rem;">
+{# ── VM SUMMARY ── #}
+{% if wid == 'vm_summary' %}
+<div class="dash-widget{% if not w.visible %} hidden-widget{% endif %}"
+     data-widget-id="vm_summary" data-widget-title="VM Controllers" data-size="{{ w.size }}" style="margin-bottom:1.5rem;">
+  <div class="widget-controls">
+    <button class="widget-ctrl-btn widget-ctrl-hide" title="{{ _('Hide') }}" onclick="hideWidget('vm_summary')">&#x2715;</button>
+  </div>
+  <div class="card" style="padding:1.1rem 1.25rem;height:100%;">
+    <div class="card-header" style="margin-bottom:0.75rem;">
+      <h3>&#x1F5A5; VM Controllers</h3>
+      <a class="btn btn-secondary btn-sm" href="/vm">{{ _('Manage') }}</a>
+    </div>
+    {% if vm_endpoints %}
+    <div style="display:flex;flex-direction:column;gap:0.4rem;">
+      {% for ep in vm_endpoints[:6] %}
+      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.45rem 0.6rem;background:var(--bg-elevated);border-radius:var(--radius-md);border:1px solid var(--border);">
+        <span style="font-size:0.85rem;font-weight:600;min-width:100px;">{{ ep.name }}</span>
+        <span class="badge badge-blue" style="font-size:0.65rem;">{{ ep.platform|default('proxmox') }}</span>
+        <span style="font-size:0.75rem;color:var(--text-muted);flex:1;">{{ ep.host }}</span>
+        <a href="/vm/{{ ep.id }}" class="btn btn-ghost btn-sm" style="padding:0.15rem 0.5rem;font-size:0.7rem;">&#x1F50D;</a>
+      </div>
+      {% endfor %}
+      {% if vm_endpoints|length > 6 %}
+      <a href="/vm" style="font-size:0.78rem;color:var(--accent-blue);text-align:center;padding-top:0.3rem;">
+        +{{ vm_endpoints|length - 6 }} {{ _('more') }} →
+      </a>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="text-muted" style="font-size:0.85rem;">{{ _('No VM controllers configured.') }}
+      <a href="/vm/add">{{ _('Add one') }}</a></p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
-  <!-- Environment Breakdown -->
+{# ── STORAGE SUMMARY ── #}
+{% if wid == 'storage_summary' %}
+<div class="dash-widget{% if not w.visible %} hidden-widget{% endif %}"
+     data-widget-id="storage_summary" data-widget-title="Storage Controllers" data-size="{{ w.size }}" style="margin-bottom:1.5rem;">
+  <div class="widget-controls">
+    <button class="widget-ctrl-btn widget-ctrl-hide" title="{{ _('Hide') }}" onclick="hideWidget('storage_summary')">&#x2715;</button>
+  </div>
+  <div class="card" style="padding:1.1rem 1.25rem;height:100%;">
+    <div class="card-header" style="margin-bottom:0.75rem;">
+      <h3>&#x1F5C4; Storage Controllers</h3>
+      <a class="btn btn-secondary btn-sm" href="/storage">{{ _('Manage') }}</a>
+    </div>
+    {% if storage_endpoints %}
+    <div style="display:flex;flex-direction:column;gap:0.4rem;">
+      {% for ep in storage_endpoints[:6] %}
+      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.45rem 0.6rem;background:var(--bg-elevated);border-radius:var(--radius-md);border:1px solid var(--border);">
+        <span style="font-size:0.85rem;font-weight:600;min-width:100px;">{{ ep.name }}</span>
+        <span class="badge badge-purple" style="font-size:0.65rem;">{{ ep.platform|default('truenas') }}</span>
+        <span style="font-size:0.75rem;color:var(--text-muted);flex:1;">{{ ep.host }}</span>
+        <a href="/storage/{{ ep.id }}" class="btn btn-ghost btn-sm" style="padding:0.15rem 0.5rem;font-size:0.7rem;">&#x1F50D;</a>
+      </div>
+      {% endfor %}
+      {% if storage_endpoints|length > 6 %}
+      <a href="/storage" style="font-size:0.78rem;color:var(--accent-blue);text-align:center;padding-top:0.3rem;">
+        +{{ storage_endpoints|length - 6 }} {{ _('more') }} →
+      </a>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="text-muted" style="font-size:0.85rem;">{{ _('No storage controllers configured.') }}
+      <a href="/storage/add">{{ _('Add one') }}</a></p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# ── SMART SUMMARY ── #}
+{% if wid == 'smart_summary' %}
+<div class="dash-widget{% if not w.visible %} hidden-widget{% endif %}"
+     data-widget-id="smart_summary" data-widget-title="SMART / Disk Health" data-size="{{ w.size }}" style="margin-bottom:1.5rem;">
+  <div class="widget-controls">
+    <button class="widget-ctrl-btn widget-ctrl-hide" title="{{ _('Hide') }}" onclick="hideWidget('smart_summary')">&#x2715;</button>
+  </div>
+  <div class="card" style="padding:1.1rem 1.25rem;height:100%;">
+    <div class="card-header" style="margin-bottom:0.75rem;">
+      <h3>&#x1F4CA; SMART / {{ _('Disk Health') }}</h3>
+      <a class="btn btn-secondary btn-sm" href="/smart">{{ _('Dashboard') }}</a>
+    </div>
+    {% if smart_summary %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:0.6rem;">
+      {% if smart_summary.total_disks is defined %}
+      <div style="text-align:center;padding:0.6rem;background:var(--bg-elevated);border-radius:var(--radius-md);">
+        <div style="font-size:1.4rem;font-weight:700;">{{ smart_summary.total_disks }}</div>
+        <div style="font-size:0.7rem;color:var(--text-muted);">{{ _('Total Disks') }}</div>
+      </div>
+      {% endif %}
+      {% if smart_summary.healthy is defined %}
+      <div style="text-align:center;padding:0.6rem;background:var(--bg-elevated);border-radius:var(--radius-md);">
+        <div style="font-size:1.4rem;font-weight:700;color:var(--accent-green,#38a169);">{{ smart_summary.healthy }}</div>
+        <div style="font-size:0.7rem;color:var(--text-muted);">{{ _('Healthy') }}</div>
+      </div>
+      {% endif %}
+      {% if smart_summary.warning is defined and smart_summary.warning > 0 %}
+      <div style="text-align:center;padding:0.6rem;background:var(--bg-elevated);border-radius:var(--radius-md);">
+        <div style="font-size:1.4rem;font-weight:700;color:#d69e2e;">{{ smart_summary.warning }}</div>
+        <div style="font-size:0.7rem;color:var(--text-muted);">{{ _('Warning') }}</div>
+      </div>
+      {% endif %}
+      {% if smart_summary.critical is defined and smart_summary.critical > 0 %}
+      <div style="text-align:center;padding:0.6rem;background:var(--bg-elevated);border-radius:var(--radius-md);">
+        <div style="font-size:1.4rem;font-weight:700;color:#e53e3e;">{{ smart_summary.critical }}</div>
+        <div style="font-size:0.7rem;color:var(--text-muted);">{{ _('Critical') }}</div>
+      </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="text-muted" style="font-size:0.85rem;">{{ _('No SMART data available yet.') }}</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# ── FLEET OVERVIEW ── #}
+{% if wid == 'fleet_overview' and hosts %}
+<div class="dash-widget{% if not w.visible %} hidden-widget{% endif %}"
+     data-widget-id="fleet_overview" data-widget-title="{{ _('Fleet Overview') }}" data-size="{{ w.size }}" style="margin-bottom:1.5rem;">
+  <div class="widget-controls">
+    <button class="widget-ctrl-btn widget-ctrl-hide" title="{{ _('Hide') }}" onclick="hideWidget('fleet_overview')">&#x2715;</button>
+  </div>
   <div class="card" style="padding:1.1rem 1.25rem;">
+    <div class="card-header" style="margin-bottom:0.75rem;">
+      <h3>&#x1F5A7; {{ _('Fleet Overview') }}</h3>
+      <a class="btn btn-secondary btn-sm" href="/hosts">{{ _('View All') }}</a>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:0.4rem;">
+      {% for name, h in hosts.items() %}
+      {% set env_slug = (h.environment|lower).replace(' ','') %}
+      {% set crit_slug = h.criticality|lower %}
+      <div style="display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0.75rem;
+                  background:var(--bg-elevated);border-radius:var(--radius-md);
+                  border:1px solid var(--border);">
+        <div style="font-weight:600;font-size:0.9rem;min-width:120px;">{{ name }}</div>
+        <div style="flex:1;font-size:0.8rem;color:var(--text-muted);">
+          &#x1F4BB; {{ h.host }} &nbsp;·&nbsp; &#x1F464; {{ h.user }}
+          {% if h.location %}&nbsp;·&nbsp; &#x1F4CD; {{ h.location }}{% endif %}
+          {% if h.description %}&nbsp;·&nbsp; <span style="color:var(--text-secondary);">{{ h.description[:40] }}{% if h.description|length > 40 %}…{% endif %}</span>{% endif %}
+        </div>
+        <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
+          <span class="env-badge env-{{ env_slug }}">{{ h.environment }}</span>
+          <span class="crit-badge crit-{{ crit_slug }}">{{ h.criticality }}</span>
+          {% for tag in h.tags[:2] %}
+          <span class="tag-chip tag-chip-default">{{ tag }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── ENVIRONMENT BREAKDOWN ── #}
+{% if wid == 'env_breakdown' %}
+<div class="dash-widget{% if not w.visible %} hidden-widget{% endif %}"
+     data-widget-id="env_breakdown" data-widget-title="{{ _('Environments') }}" data-size="{{ w.size }}" style="margin-bottom:1.5rem;">
+  <div class="widget-controls">
+    <button class="widget-ctrl-btn widget-ctrl-hide" title="{{ _('Hide') }}" onclick="hideWidget('env_breakdown')">&#x2715;</button>
+  </div>
+  <div class="card" style="padding:1.1rem 1.25rem;height:100%;">
     <div class="card-header" style="margin-bottom:0.75rem;">
       <h3>&#x1F30D; {{ _('Environments') }}</h3>
     </div>
@@ -89,9 +452,17 @@
     <p class="text-muted" style="font-size:0.85rem;">{{ _('No environment data yet.') }}</p>
     {% endif %}
   </div>
+</div>
+{% endif %}
 
-  <!-- Tag Cloud -->
-  <div class="card" style="padding:1.1rem 1.25rem;">
+{# ── TAG CLOUD ── #}
+{% if wid == 'tag_cloud' %}
+<div class="dash-widget{% if not w.visible %} hidden-widget{% endif %}"
+     data-widget-id="tag_cloud" data-widget-title="{{ _('Tag Cloud') }}" data-size="{{ w.size }}" style="margin-bottom:1.5rem;">
+  <div class="widget-controls">
+    <button class="widget-ctrl-btn widget-ctrl-hide" title="{{ _('Hide') }}" onclick="hideWidget('tag_cloud')">&#x2715;</button>
+  </div>
+  <div class="card" style="padding:1.1rem 1.25rem;height:100%;">
     <div class="card-header" style="margin-bottom:0.75rem;">
       <h3>&#x1F3F7; {{ _('Tag Cloud') }}</h3>
     </div>
@@ -107,105 +478,331 @@
       {% endfor %}
     </div>
     {% else %}
-    <p class="text-muted" style="font-size:0.85rem;">{{ _('No tags assigned yet. Add tags to your hosts for better organization.') }}</p>
+    <p class="text-muted" style="font-size:0.85rem;">{{ _('No tags assigned yet.') }}</p>
     {% endif %}
-  </div>
-
-</div>
-
-<!-- Recent Hosts -->
-<div class="card" style="margin-bottom:1.5rem;padding:1.1rem 1.25rem;">
-  <div class="card-header" style="margin-bottom:0.75rem;">
-    <h3>&#x1F5A7; {{ _('Fleet Overview') }}</h3>
-    <a class="btn btn-secondary btn-sm" href="/hosts">{{ _('View All') }}</a>
-  </div>
-  <div style="display:flex;flex-direction:column;gap:0.4rem;">
-    {% for name, h in hosts.items() %}
-    {% set env_slug = (h.environment|lower).replace(' ','') %}
-    {% set crit_slug = h.criticality|lower %}
-    <div style="display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0.75rem;
-                background:var(--bg-elevated);border-radius:var(--radius-md);
-                border:1px solid var(--border);">
-      <div style="font-weight:600;font-size:0.9rem;min-width:120px;">{{ name }}</div>
-      <div style="flex:1;font-size:0.8rem;color:var(--text-muted);">
-        &#x1F4BB; {{ h.host }} &nbsp;·&nbsp; &#x1F464; {{ h.user }}
-        {% if h.location %}&nbsp;·&nbsp; &#x1F4CD; {{ h.location }}{% endif %}
-        {% if h.description %}&nbsp;·&nbsp; <span style="color:var(--text-secondary);">{{ h.description[:40] }}{% if h.description|length > 40 %}…{% endif %}</span>{% endif %}
-      </div>
-      <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
-        <span class="env-badge env-{{ env_slug }}">{{ h.environment }}</span>
-        <span class="crit-badge crit-{{ crit_slug }}">{{ h.criticality }}</span>
-        {% for tag in h.tags[:2] %}
-        <span class="tag-chip tag-chip-default">{{ tag }}</span>
-        {% endfor %}
-      </div>
-    </div>
-    {% endfor %}
   </div>
 </div>
 {% endif %}
 
-<!-- ── Plugin Dashboard Widgets ─────────────────────────────── -->
+{# ── RECENT UPDATES ── #}
+{% if wid == 'recent_updates' %}
+<div class="dash-widget{% if not w.visible %} hidden-widget{% endif %}"
+     data-widget-id="recent_updates" data-widget-title="{{ _('Recent Updates') }}" data-size="{{ w.size }}" style="margin-bottom:1.5rem;">
+  <div class="widget-controls">
+    <button class="widget-ctrl-btn widget-ctrl-hide" title="{{ _('Hide') }}" onclick="hideWidget('recent_updates')">&#x2715;</button>
+  </div>
+  <div class="card" style="padding:1.1rem 1.25rem;height:100%;">
+    <div class="card-header" style="margin-bottom:0.75rem;">
+      <h3>&#x1F504; {{ _('Recent Updates') }}</h3>
+      <a class="btn btn-secondary btn-sm" href="/dashboard">{{ _('View All') }}</a>
+    </div>
+    {% if recent_history %}
+    <div style="display:flex;flex-direction:column;gap:0.4rem;">
+      {% for entry in recent_history %}
+      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.45rem 0.6rem;background:var(--bg-elevated);border-radius:var(--radius-md);border:1px solid var(--border);">
+        <span style="font-size:0.85rem;font-weight:600;min-width:100px;">{{ entry.host|default('?') }}</span>
+        <span class="badge {% if entry.status == 'success' %}badge-green{% else %}badge-red{% endif %}" style="font-size:0.65rem;">
+          {{ entry.status|default('?') }}
+        </span>
+        <span style="font-size:0.75rem;color:var(--text-muted);flex:1;">{{ entry.timestamp|default('') | string | truncate(16, False, '') }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted" style="font-size:0.85rem;">{{ _('No update history yet.') }}</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# ── PLUGIN WIDGETS ── #}
+{% if wid == 'plugin_widgets' %}
 {% if addon_mgr is defined %}
-  {% set _plugin_widgets = addon_mgr.render_hooks('dashboard_widgets', hosts=hosts.values()|list, stats=stats) %}
+  {% set _plugin_widgets = addon_mgr.render_hooks('dashboard_widgets', hosts=hosts.values()|list, stats={}) %}
   {% if _plugin_widgets %}
-  <div style="margin-bottom:1.5rem">
+  <div class="dash-widget{% if not w.visible %} hidden-widget{% endif %}"
+       data-widget-id="plugin_widgets" data-widget-title="{{ _('Plugin Widgets') }}" data-size="{{ w.size }}" style="margin-bottom:1.5rem;">
+    <div class="widget-controls">
+      <button class="widget-ctrl-btn widget-ctrl-hide" title="{{ _('Hide') }}" onclick="hideWidget('plugin_widgets')">&#x2715;</button>
+    </div>
     {{ _plugin_widgets | safe }}
   </div>
   {% endif %}
 {% endif %}
+{% endif %}
 
-<!-- ── Navigation Cards ───────────────────────────────────── -->
-<div class="host-grid">
-
-  <div class="card">
-    <div class="card-header">
-      <h3>&#x1F504; {{ _('System Update Manager') }}</h3>
-      <span class="badge badge-blue">{{ _('Core') }}</span>
+{# ── NAV CARDS ── #}
+{% if wid == 'nav_cards' %}
+<div class="dash-widget{% if not w.visible %} hidden-widget{% endif %}"
+     data-widget-id="nav_cards" data-widget-title="{{ _('Navigation Cards') }}" data-size="{{ w.size }}" style="margin-bottom:1.5rem;">
+  <div class="widget-controls">
+    <button class="widget-ctrl-btn widget-ctrl-hide" title="{{ _('Hide') }}" onclick="hideWidget('nav_cards')">&#x2715;</button>
+  </div>
+  <div class="host-grid">
+    <div class="card">
+      <div class="card-header">
+        <h3>&#x1F504; {{ _('System Update Manager') }}</h3>
+        <span class="badge badge-blue">{{ _('Core') }}</span>
+      </div>
+      <p>{{ _('Monitor and update multiple Linux computers remotely via SSH.') }}</p>
+      <div class="btn-group" style="margin-top:0.75rem;">
+        <a class="btn btn-primary btn-sm" href="/dashboard">{{ _('Open Dashboard') }}</a>
+        <a class="btn btn-success btn-sm" href="/update_settings">{{ _('Settings') }}</a>
+        <a class="btn btn-secondary btn-sm" href="/email_settings">&#x2709; {{ _('Email') }}</a>
+      </div>
     </div>
-    <p>{{ _('Monitor and update multiple Linux computers remotely via SSH. View host status, trigger updates, and review history.') }}</p>
-    <div class="btn-group" style="margin-top:0.75rem;">
-      <a class="btn btn-primary btn-sm" href="/dashboard">{{ _('Open Dashboard') }}</a>
-      <a class="btn btn-success btn-sm" href="/update_settings">{{ _('Settings') }}</a>
-      <a class="btn btn-secondary btn-sm" href="/email_settings">&#x2709; {{ _('Email') }}</a>
+    <div class="card">
+      <div class="card-header">
+        <h3>&#x1F4BE; {{ _('Disk Management') }}</h3>
+        <span class="badge badge-purple">{{ _('Tools') }}</span>
+      </div>
+      <p>{{ _('Format, test, and validate disk drives with SMART monitoring.') }}</p>
+      <div class="btn-group" style="margin-top:0.75rem;">
+        <a class="btn btn-primary btn-sm" href="/disks">{{ _('Open Disk Tools') }}</a>
+        <a class="btn btn-secondary btn-sm" href="/smart">&#x1F4CA; SMART</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <h3>&#x1F5A5; VM &amp; Storage</h3>
+        <span class="badge badge-blue">{{ _('Infrastructure') }}</span>
+      </div>
+      <p>{{ _('Manage Proxmox VM controllers, TrueNAS/Unraid storage and SMART health.') }}</p>
+      <div class="btn-group" style="margin-top:0.75rem;">
+        <a class="btn btn-primary btn-sm" href="/vm">VM Controllers</a>
+        <a class="btn btn-secondary btn-sm" href="/storage">Storage</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <h3>&#x1F5A7; {{ _('Host Management') }}</h3>
+        <span class="badge badge-green">{{ _('Network') }}</span>
+      </div>
+      <p>{{ _('Add, edit, and remove managed hosts. Assign tags, groups, and configure SSH keys.') }}</p>
+      <div class="btn-group" style="margin-top:0.75rem;">
+        <a class="btn btn-primary btn-sm" href="/hosts">{{ _('Manage Hosts') }}</a>
+        <a class="btn btn-secondary btn-sm" href="/hosts/arp_table">{{ _('ARP Table') }}</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <h3>&#x1F464; {{ _('User & Profile') }}</h3>
+        <span class="badge badge-amber">{{ _('Account') }}</span>
+      </div>
+      <p>{{ _('Manage your profile, update credentials, and administer user accounts and roles.') }}</p>
+      <div class="btn-group" style="margin-top:0.75rem;">
+        <a class="btn btn-primary btn-sm" href="/users/profile">{{ _('My Profile') }}</a>
+        <a class="btn btn-secondary btn-sm" href="/users">{{ _('User Admin') }}</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <h3>&#x1F50D; CheckMK</h3>
+        <span class="badge badge-cyan" style="background:var(--accent-cyan,#0bc5ea);color:#fff;">{{ _('Monitoring') }}</span>
+      </div>
+      <p>{{ _('CheckMK integration for host monitoring, piggyback data, and API status.') }}</p>
+      <div class="btn-group" style="margin-top:0.75rem;">
+        <a class="btn btn-primary btn-sm" href="/checkmk">CheckMK</a>
+        <a class="btn btn-secondary btn-sm" href="/scanner">&#x1F50D; {{ _('Scanner') }}</a>
+      </div>
     </div>
   </div>
-
-  <div class="card">
-    <div class="card-header">
-      <h3>&#x1F4BE; {{ _('Disk Management') }}</h3>
-      <span class="badge badge-purple">{{ _('Tools') }}</span>
-    </div>
-    <p>{{ _('Format, test, and validate disk drives with SMART monitoring. Track disk health and manage storage devices.') }}</p>
-    <div class="btn-group" style="margin-top:0.75rem;">
-      <a class="btn btn-primary btn-sm" href="/disks">{{ _('Open Disk Tools') }}</a>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-header">
-      <h3>&#x1F5A7; {{ _('Host Management') }}</h3>
-      <span class="badge badge-green">{{ _('Network') }}</span>
-    </div>
-    <p>{{ _('Add, edit, and remove managed hosts. Assign tags, groups, descriptions and configure SSH keys.') }}</p>
-    <div class="btn-group" style="margin-top:0.75rem;">
-      <a class="btn btn-primary btn-sm" href="/hosts">{{ _('Manage Hosts') }}</a>
-      <a class="btn btn-secondary btn-sm" href="/hosts/arp_table">{{ _('ARP Table') }}</a>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-header">
-      <h3>&#x1F464; {{ _('User & Profile') }}</h3>
-      <span class="badge badge-amber">{{ _('Account') }}</span>
-    </div>
-    <p>{{ _('Manage your profile, update credentials, and administer user accounts and roles.') }}</p>
-    <div class="btn-group" style="margin-top:0.75rem;">
-      <a class="btn btn-primary btn-sm" href="/users/profile">{{ _('My Profile') }}</a>
-      <a class="btn btn-secondary btn-sm" href="/users">{{ _('User Admin') }}</a>
-    </div>
-  </div>
-
 </div>
+{% endif %}
+
+{% endfor %}{# end sorted_widgets loop #}
+
+</div>{# end dashboardContainer #}
+
+<!-- ── Dashboard Customization Script ────────────────────────────────────── -->
+<script>
+(function() {
+  // ── State ──────────────────────────────────────────────────────────────────
+  let editMode = false;
+  let dragSrc  = null;
+
+  // Build layout state from server-rendered DOM
+  function getWidgets() {
+    return Array.from(document.querySelectorAll('#dashboardContainer .dash-widget'));
+  }
+
+  function buildLayoutFromDOM() {
+    const widgets = [];
+    getWidgets().forEach((el, idx) => {
+      widgets.push({
+        id:      el.dataset.widgetId,
+        title:   el.dataset.widgetTitle || el.dataset.widgetId,
+        visible: !el.classList.contains('hidden-widget'),
+        order:   idx,
+        size:    el.dataset.size || 'full',
+      });
+    });
+    return { widgets };
+  }
+
+  // ── Edit Mode Toggle ───────────────────────────────────────────────────────
+  window.toggleEditMode = function() {
+    editMode = !editMode;
+    const container = document.getElementById('dashboardContainer');
+    const btn       = document.getElementById('btnEditMode');
+    const btnSave   = document.getElementById('btnSave');
+    const btnReset  = document.getElementById('btnReset');
+    const hint      = document.getElementById('dashToolbarHint');
+    const panel     = document.getElementById('hiddenWidgetsPanel');
+
+    if (editMode) {
+      container.classList.add('edit-mode');
+      getWidgets().forEach(el => {
+        el.classList.add('edit-mode');
+        el.setAttribute('draggable', 'true');
+        bindDrag(el);
+      });
+      btn.classList.add('active');
+      btn.textContent = '✖ Done';
+      btnSave.style.display  = '';
+      btnReset.style.display = '';
+      hint.textContent = '⠿ Drag to reorder · ✕ to hide · 💾 to save';
+      panel.classList.add('visible');
+      refreshHiddenPanel();
+    } else {
+      container.classList.remove('edit-mode');
+      getWidgets().forEach(el => {
+        el.classList.remove('edit-mode');
+        el.removeAttribute('draggable');
+      });
+      btn.classList.remove('active');
+      btn.innerHTML = '✏️ Customize';
+      btnSave.style.display  = 'none';
+      btnReset.style.display = 'none';
+      hint.textContent = '';
+      panel.classList.remove('visible');
+    }
+  };
+
+  // ── Drag & Drop ────────────────────────────────────────────────────────────
+  function bindDrag(el) {
+    el.addEventListener('dragstart', onDragStart);
+    el.addEventListener('dragover',  onDragOver);
+    el.addEventListener('dragleave', onDragLeave);
+    el.addEventListener('drop',      onDrop);
+    el.addEventListener('dragend',   onDragEnd);
+  }
+
+  function onDragStart(e) {
+    dragSrc = this;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', this.dataset.widgetId);
+    setTimeout(() => this.style.opacity = '0.4', 0);
+  }
+  function onDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (this !== dragSrc) this.classList.add('drag-over');
+    return false;
+  }
+  function onDragLeave() { this.classList.remove('drag-over'); }
+  function onDrop(e) {
+    e.stopPropagation();
+    if (dragSrc && this !== dragSrc) {
+      const container = document.getElementById('dashboardContainer');
+      const nodes     = Array.from(container.children);
+      const srcIdx    = nodes.indexOf(dragSrc);
+      const tgtIdx    = nodes.indexOf(this);
+      if (srcIdx < tgtIdx) {
+        container.insertBefore(dragSrc, this.nextSibling);
+      } else {
+        container.insertBefore(dragSrc, this);
+      }
+    }
+    this.classList.remove('drag-over');
+    return false;
+  }
+  function onDragEnd() {
+    this.style.opacity = '';
+    getWidgets().forEach(el => el.classList.remove('drag-over'));
+  }
+
+  // ── Hide / Show Widgets ────────────────────────────────────────────────────
+  window.hideWidget = function(id) {
+    const el = document.querySelector(`[data-widget-id="${id}"]`);
+    if (el) {
+      el.classList.add('hidden-widget');
+      refreshHiddenPanel();
+    }
+  };
+
+  function showWidget(id) {
+    const el = document.querySelector(`[data-widget-id="${id}"]`);
+    if (el) {
+      el.classList.remove('hidden-widget');
+      refreshHiddenPanel();
+    }
+  }
+
+  function refreshHiddenPanel() {
+    const chips = document.getElementById('hiddenWidgetChips');
+    chips.innerHTML = '';
+    const hidden = getWidgets().filter(el => el.classList.contains('hidden-widget'));
+    if (!hidden.length) {
+      chips.innerHTML = '<span style="font-size:0.8rem;color:var(--text-muted);">All widgets are visible.</span>';
+      return;
+    }
+    hidden.forEach(el => {
+      const chip = document.createElement('span');
+      chip.className = 'hidden-widget-chip';
+      chip.textContent = '+ ' + (el.dataset.widgetTitle || el.dataset.widgetId);
+      chip.onclick = () => showWidget(el.dataset.widgetId);
+      chips.appendChild(chip);
+    });
+  }
+
+  // ── Save Layout ────────────────────────────────────────────────────────────
+  window.saveLayout = function() {
+    const layout = buildLayoutFromDOM();
+    fetch('/api/dashboard/layout', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify(layout),
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        showToast('✅ Layout saved!', 'success');
+        toggleEditMode();
+      } else {
+        showToast('❌ ' + (d.error || 'Save failed'), 'error');
+      }
+    })
+    .catch(() => showToast('❌ Network error', 'error'));
+  };
+
+  // ── Reset Layout ───────────────────────────────────────────────────────────
+  window.resetLayout = function() {
+    if (!confirm('Reset dashboard to default layout? This cannot be undone.')) return;
+    fetch('/api/dashboard/layout/reset', { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) { location.reload(); }
+      else { showToast('❌ Reset failed', 'error'); }
+    })
+    .catch(() => showToast('❌ Network error', 'error'));
+  };
+
+  // ── Toast Notification ─────────────────────────────────────────────────────
+  function showToast(msg, type) {
+    const t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = `
+      position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;
+      padding:0.75rem 1.25rem;border-radius:8px;font-size:0.85rem;font-weight:500;
+      background:${type === 'success' ? '#276749' : '#822727'};color:#fff;
+      box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:opacity 0.4s;
+    `;
+    document.body.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 2500);
+  }
+
+})();
+</script>
 
 {% endblock %}

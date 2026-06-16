@@ -123,6 +123,40 @@ def sanitize_input(value, max_len=256):
         return ''
     return value
 
+import ipaddress as _ipaddress
+import re as _re_host
+
+# Allowed hostname pattern: RFC-1123 labels, optional port suffix stripped before check
+_HOSTNAME_RE = _re_host.compile(
+    r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)*'
+    r'[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$'
+)
+
+
+def validate_host_address(value: str) -> str:
+    """Validate and normalise a host address (IPv4, IPv6, or hostname).
+
+    Returns the sanitised value if valid, or raises ``ValueError`` with a
+    human-readable message so the caller can surface it to the user.
+    """
+    value = value.strip()
+    if not value:
+        return value  # empty is allowed (host field optional in some flows)
+    # Try IPv4 / IPv6 first
+    try:
+        addr = _ipaddress.ip_address(value)
+        return str(addr)
+    except ValueError:
+        pass
+    # Accept plain hostnames (strip optional port)
+    host_part = value.split(":")[0] if ":" in value and not value.startswith("[") else value
+    if _HOSTNAME_RE.match(host_part) and len(host_part) <= 253:
+        return value
+    raise ValueError(
+        f"'{value}' is not a valid IPv4 address, IPv6 address, or hostname."
+    )
+
+
 def sanitize_host_data(data):
     """Sanitize all string fields in a host data dict."""
     for field in ('host','user','mac','description','notes','group',
@@ -417,6 +451,27 @@ def index():
     tag_counts = {}
     for t in all_tags:
         tag_counts[t] = tag_counts.get(t, 0) + 1
+
+    # VM / Storage / SMART summary for dashboard widgets
+    try:
+        vm_endpoints = vm_controller.list_endpoints()
+    except Exception:
+        vm_endpoints = []
+    try:
+        storage_endpoints = storage_controller.list_endpoints()
+    except Exception:
+        storage_endpoints = []
+    try:
+        smart_summary = smart_manager.get_health_summary()
+    except Exception:
+        smart_summary = {}
+
+    # Per-user dashboard layout
+    layout = user_management.get_dashboard_layout(user_id) if user_id else user_management.DEFAULT_DASHBOARD_LAYOUT
+
+    # Recent update history (last 5)
+    recent_history = history[-5:][::-1] if history else []
+
     return render_template(
         "index.html",
         host_count=len(hosts),
@@ -426,7 +481,47 @@ def index():
         tag_counts=tag_counts,
         env_counts=env_counts,
         hosts=hosts,
+        vm_endpoints=vm_endpoints,
+        storage_endpoints=storage_endpoints,
+        smart_summary=smart_summary,
+        dashboard_layout=layout,
+        recent_history=recent_history,
     )
+
+
+# ── Dashboard Layout API ──────────────────────────────────────────────────────
+
+@app.route("/api/dashboard/layout", methods=["GET"])
+@login_required
+def api_dashboard_layout_get():
+    """Return the current user's dashboard layout as JSON."""
+    user_id = session.get("user_id")
+    layout = user_management.get_dashboard_layout(user_id)
+    return jsonify(layout)
+
+
+@app.route("/api/dashboard/layout", methods=["POST"])
+@login_required
+def api_dashboard_layout_save():
+    """Persist the current user's dashboard layout."""
+    user_id = session.get("user_id")
+    data = request.get_json(force=True, silent=True)
+    if not data:
+        return jsonify({"ok": False, "error": "Invalid JSON"}), 400
+    try:
+        user_management.save_dashboard_layout(user_id, data)
+        return jsonify({"ok": True})
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+
+@app.route("/api/dashboard/layout/reset", methods=["POST"])
+@login_required
+def api_dashboard_layout_reset():
+    """Reset the current user's dashboard layout to defaults."""
+    user_id = session.get("user_id")
+    user_management.reset_dashboard_layout(user_id)
+    return jsonify({"ok": True})
 
 @app.route("/dashboard")
 @login_required
@@ -648,7 +743,12 @@ def manage_hosts():
         
         # Add or update host via the add form
         name = sanitize_input(request.form.get("name", ""), max_len=64)
-        host = sanitize_input(request.form.get("host", ""), max_len=253)
+        raw_host = sanitize_input(request.form.get("host", ""), max_len=253)
+        try:
+            host = validate_host_address(raw_host)
+        except ValueError as _ve:
+            flash(f'Invalid host address: {_ve}', 'error')
+            return redirect(url_for('manage_hosts'))
         user = sanitize_input(request.form.get("user", ""), max_len=64)
         mac  = sanitize_input(request.form.get("mac", ""), max_len=17)
         if name:
@@ -708,7 +808,12 @@ def edit_host(orig_name):
             return redirect(url_for('manage_hosts'))
         
         new_name = sanitize_input(request.form.get("name", ""), max_len=64)
-        host = sanitize_input(request.form.get("host", ""), max_len=253)
+        raw_host = sanitize_input(request.form.get("host", ""), max_len=253)
+        try:
+            host = validate_host_address(raw_host)
+        except ValueError as _ve:
+            flash(f'Invalid host address: {_ve}', 'error')
+            return redirect(url_for('edit_host', orig_name=orig_name))
         user = sanitize_input(request.form.get("user", ""), max_len=64)
         mac  = sanitize_input(request.form.get("mac", ""), max_len=17)
         if new_name:
@@ -1520,6 +1625,20 @@ def api_dismiss_notification():
     version_manager.dismiss_notification()
     return jsonify({'ok': True})
 
+# ── /update landing page (backward-compat alias) ─────────────────────────────
+@app.route("/update")
+@login_required
+def update_landing():
+    """Redirect bare /update to the host list so old links / test scripts don't 404."""
+    hosts = load_hosts()
+    if hosts:
+        # Redirect to the first host's update page as a sensible default
+        first = next(iter(hosts))
+        return redirect(url_for('update_repo', name=first))
+    flash('No hosts configured. Please add a host first.', 'warning')
+    return redirect(url_for('manage_hosts'))
+
+
 # ---- Server Self-Update Tool ----
 
 _server_update_log = []   # in-memory log for the running update
@@ -2123,6 +2242,7 @@ def storage_poll(ep_id):
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.route("/smart")
+@app.route("/smart/dashboard")   # backward-compat alias (test scripts / old bookmarks)
 @login_required
 def smart_dashboard():
     """SMART Manager — unified disk health dashboard."""
@@ -2138,6 +2258,7 @@ def smart_dashboard():
 
 
 @app.route("/smart/poll", methods=["POST"])
+@app.route("/smart/poll_now", methods=["POST"])   # backward-compat alias
 @login_required
 def smart_poll_now():
     """Trigger an immediate SMART poll of ALL sources (local + SSH hosts + Proxmox + Storage)."""
@@ -2310,6 +2431,25 @@ def _check_cmk_token():
     return token == expected
 
 
+@app.route("/api/checkmk/token_info")
+@login_required
+def api_checkmk_token_info():
+    """Return the current CheckMK API token for authenticated dashboard users.
+
+    This allows scripts and integrations running inside the same browser
+    session to discover the token without visiting /checkmk manually.
+    """
+    token = _get_or_create_cmk_token()
+    base_url = request.host_url.rstrip("/")
+    return jsonify({
+        "token": token,
+        "usage": {
+            "header": "X-FleetPilot-Token: " + token,
+            "query":  base_url + "/api/checkmk/status?token=" + token,
+        }
+    })
+
+
 @app.route("/api/checkmk/agent")
 def api_checkmk_agent():
     """CheckMK datasource program endpoint — returns <<<local>>> section."""
@@ -2350,9 +2490,22 @@ def api_checkmk_hosts():
 
 @app.route("/api/checkmk/status")
 def api_checkmk_status():
-    """Structured JSON status for CheckMK REST API or Grafana."""
+    """Structured JSON status for CheckMK REST API or Grafana.
+
+    Authentication: pass the FleetPilot API token via the
+    ``X-FleetPilot-Token`` request header **or** the ``?token=<value>``
+    query parameter.  Retrieve the token from the CheckMK integration
+    page at ``/checkmk``.
+    """
     if not _check_cmk_token():
-        return jsonify({"error": "Unauthorized"}), 401
+        return jsonify({
+            "error": "Unauthorized",
+            "hint": (
+                "Supply the API token via the 'X-FleetPilot-Token' header "
+                "or '?token=<value>' query parameter. "
+                "Find your token at /checkmk."
+            )
+        }), 401
     hosts = load_hosts()
     data = _cmk.build_status_json(
         hosts,
