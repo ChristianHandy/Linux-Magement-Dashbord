@@ -11,7 +11,14 @@ from functools import wraps
 from flask import session, redirect, url_for, flash, request
 
 # Database file for user management
-USER_DB_FILE = Path(__file__).parent / 'users.db'
+# Stored in DATA_DIR (persistent across git-pull updates)
+def _get_data_dir():
+    _app_dir = Path(__file__).parent
+    data_dir = Path(os.environ.get('FLEETPILOT_DATA_DIR', str(_app_dir / 'data')))
+    data_dir.mkdir(exist_ok=True)
+    return data_dir
+
+USER_DB_FILE = _get_data_dir() / 'users.db'
 
 def get_user_db():
     """Get database connection for user management."""

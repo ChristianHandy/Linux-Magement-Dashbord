@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block title %}FleetPilot Update — FleetPilot{% endblock %}
+{% block page_icon %}🚀{% endblock %}
+{% block page_title %}FleetPilot Update{% endblock %}
+
+{% block topbar_actions %}
+<a class="btn btn-secondary btn-sm" href="/index">&#x2190; Dashboard</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Current Version Card -->
+<div class="card" style="margin-bottom:1.25rem;">
+  <div class="card-header">
+    <h3>📦 FleetPilot Application Update</h3>
+    <span class="badge badge-amber">Admin Only</span>
+  </div>
+  <p>This tool updates FleetPilot itself by pulling the latest code from GitHub and restarting the service. All your configured servers, users and settings are preserved in the <code>data/</code> directory.</p>
+  <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:0.75rem;">
+    <div class="stat-mini">
+      <span class="stat-mini-label">Current Version</span>
+      <span class="stat-mini-value" id="currentVersion">{{ current_version }}</span>
+    </div>
+    <div class="stat-mini">
+      <span class="stat-mini-label">Git Branch</span>
+      <span class="stat-mini-value" id="gitBranch">{{ git_branch }}</span>
+    </div>
+    <div class="stat-mini">
+      <span class="stat-mini-label">Last Commit</span>
+      <span class="stat-mini-value" id="lastCommit" style="font-family:monospace;font-size:0.8rem;">{{ last_commit }}</span>
+    </div>
+    <div class="stat-mini">
+      <span class="stat-mini-label">Status</span>
+      <span class="stat-mini-value" id="statusBadge">
+        {% if running %}<span class="badge badge-amber">Running</span>{% else %}<span class="badge badge-blue">Idle</span>{% endif %}
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Update Controls -->
+<div class="card" style="margin-bottom:1.25rem;" id="controlCard">
+  <div class="card-header">
+    <h3>⚙️ Update Controls</h3>
+  </div>
+
+  <div id="startForm" style="{% if running %}display:none;{% endif %}">
+    <div class="form-grid-2" style="margin-bottom:1rem;">
+      <div class="form-group">
+        <label class="form-label">Update Channel</label>
+        <select id="updateChannel">
+          <option value="main">main (stable)</option>
+          <option value="develop">develop (latest)</option>
+        </select>
+        <div class="form-hint">Choose which Git branch to pull from.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">After Update</label>
+        <select id="afterUpdate">
+          <option value="restart">Restart FleetPilot service</option>
+          <option value="norestart">Do not restart (manual restart required)</option>
+        </select>
+        <div class="form-hint">The service restart takes ~5 seconds. Your session will be preserved.</div>
+      </div>
+    </div>
+
+    <div style="background:var(--bg-surface);border:1px solid var(--accent-amber);border-radius:var(--radius-md);padding:0.75rem 1rem;margin-bottom:1rem;display:flex;gap:0.75rem;align-items:flex-start;">
+      <span style="font-size:1.2rem;">⚠️</span>
+      <div>
+        <strong>Before updating:</strong> Your data (servers, users, settings) is stored in <code>data/</code> and will not be affected. However, if you have manually edited template files, those changes may be overwritten by the update.
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-primary" id="startBtn" onclick="startUpdate()">
+        🚀 Pull &amp; Update FleetPilot
+      </button>
+      <button class="btn btn-secondary" onclick="checkUpdates()">
+        🔍 Check for Updates Only
+      </button>
+      <button class="btn btn-ghost" onclick="clearLog()">
+        🗑 Clear Log
+      </button>
+    </div>
+  </div>
+
+  <div id="runningControls" style="{% if not running %}display:none;{% endif %}">
+    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+      <div class="spinner" style="width:20px;height:20px;border-width:3px;"></div>
+      <span style="font-weight:600;color:var(--accent-amber);">Update in progress — do not close this page</span>
+    </div>
+  </div>
+</div>
+
+<!-- Live Log -->
+<div class="card">
+  <div class="card-header">
+    <h3>📋 Live Output</h3>
+    <div style="display:flex;gap:0.5rem;align-items:center;">
+      <span id="logCount" class="badge badge-blue">0 lines</span>
+      <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;cursor:pointer;">
+        <input type="checkbox" id="autoScroll" checked> Auto-scroll
+      </label>
+    </div>
+  </div>
+
+  <div id="logContainer" style="
+    background: var(--bg-base);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    min-height: 200px;
+    max-height: 500px;
+    overflow-y: auto;
+  ">
+    {% if log %}
+      {% for entry in log %}
+        <div class="log-line log-{{ entry.level }}">
+          <span style="color:var(--text-muted);user-select:none;">{{ entry.ts }}</span>
+          <span> {{ entry.msg }}</span>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div style="color:var(--text-muted);font-style:italic;">No output yet. Click "Pull &amp; Update FleetPilot" to start.</div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+.log-line { padding: 1px 0; }
+.log-info    span:last-child { color: var(--text-primary); }
+.log-success span:last-child { color: var(--accent-green); }
+.log-error   span:last-child { color: var(--accent-red); font-weight: 600; }
+.log-warn    span:last-child { color: var(--accent-amber); }
+.stat-mini { display:flex;flex-direction:column;gap:0.2rem;padding:0.5rem 0.75rem;background:var(--bg-surface);border-radius:var(--radius-sm);border:1px solid var(--border-subtle); }
+.stat-mini-label { font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em; }
+.stat-mini-value { font-size:0.9rem;font-weight:600;color:var(--text-primary); }
+.spinner { border:3px solid var(--border-subtle);border-top-color:var(--accent-amber);border-radius:50%;animation:spin 0.8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+
+<script>
+let pollInterval = null;
+let lastLogCount = {{ log | length }};
+let isRunning = {{ 'true' if running else 'false' }};
+
+function startUpdate() {
+  const channel = document.getElementById('updateChannel').value;
+  const afterUpdate = document.getElementById('afterUpdate').value;
+
+  if (!confirm('Pull latest code from branch "' + channel + '" and update FleetPilot?')) return;
+
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('startBtn').textContent = '⏳ Starting…';
+
+  const fd = new FormData();
+  fd.append('action', 'start');
+  fd.append('channel', channel);
+  fd.append('after_update', afterUpdate);
+  fd.append('csrf_token', '{{ csrf_token() }}');
+
+  fetch('/fleetpilot_update', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+      if (data.started) {
+        isRunning = true;
+        document.getElementById('startForm').style.display = 'none';
+        document.getElementById('runningControls').style.display = 'flex';
+        document.getElementById('statusBadge').innerHTML = '<span class="badge badge-amber">Running</span>';
+        startPolling();
+      } else {
+        alert(data.error || 'Failed to start update.');
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('startBtn').textContent = '🚀 Pull & Update FleetPilot';
+      }
+    })
+    .catch(e => {
+      alert('Error: ' + e);
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('startBtn').textContent = '🚀 Pull & Update FleetPilot';
+    });
+}
+
+function checkUpdates() {
+  const channel = document.getElementById('updateChannel').value;
+  const fd = new FormData();
+  fd.append('action', 'check');
+  fd.append('channel', channel);
+  fd.append('csrf_token', '{{ csrf_token() }}');
+
+  fetch('/fleetpilot_update', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+      if (data.started) {
+        isRunning = true;
+        document.getElementById('startForm').style.display = 'none';
+        document.getElementById('runningControls').style.display = 'flex';
+        startPolling();
+      }
+    });
+}
+
+function clearLog() {
+  if (isRunning) return;
+  const fd = new FormData();
+  fd.append('action', 'clear');
+  fd.append('csrf_token', '{{ csrf_token() }}');
+  fetch('/fleetpilot_update', { method: 'POST', body: fd })
+    .then(() => {
+      document.getElementById('logContainer').innerHTML =
+        '<div style="color:var(--text-muted);font-style:italic;">Log cleared.</div>';
+      lastLogCount = 0;
+      document.getElementById('logCount').textContent = '0 lines';
+    });
+}
+
+function startPolling() {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(pollLog, 1500);
+}
+
+function pollLog() {
+  fetch('/api/fleetpilot_update_log')
+    .then(r => r.json())
+    .then(data => {
+      updateUI(data);
+      if (!data.running && isRunning) {
+        isRunning = false;
+        clearInterval(pollInterval);
+        pollInterval = null;
+        document.getElementById('startForm').style.display = 'block';
+        document.getElementById('runningControls').style.display = 'none';
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('startBtn').textContent = '🚀 Pull & Update FleetPilot';
+        const success = data.log && data.log.some(e => e.level === 'success');
+        document.getElementById('statusBadge').innerHTML = success
+          ? '<span class="badge badge-green">Done ✓</span>'
+          : '<span class="badge badge-red">Finished with errors</span>';
+        if (data.restart_pending) {
+          document.getElementById('statusBadge').innerHTML = '<span class="badge badge-amber">Restarting…</span>';
+          setTimeout(() => { window.location.reload(); }, 8000);
+        }
+      }
+    })
+    .catch(() => {});
+}
+
+function updateUI(data) {
+  const container = document.getElementById('logContainer');
+  const newEntries = (data.log || []).slice(lastLogCount);
+  if (newEntries.length > 0) {
+    if (lastLogCount === 0) container.innerHTML = '';
+    newEntries.forEach(entry => {
+      const div = document.createElement('div');
+      div.className = 'log-line log-' + (entry.level || 'info');
+      div.innerHTML = `<span style="color:var(--text-muted);user-select:none;">${entry.ts}</span> <span>${escapeHtml(entry.msg)}</span>`;
+      container.appendChild(div);
+    });
+    lastLogCount = data.log.length;
+    document.getElementById('logCount').textContent = lastLogCount + ' lines';
+    if (document.getElementById('autoScroll').checked) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+if (isRunning) { startPolling(); }
+</script>
+{% endblock %}

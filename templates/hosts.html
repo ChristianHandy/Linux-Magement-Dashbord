@@ -169,7 +169,6 @@
       <form method="post" action="/hosts/delete/{{ name }}" style="margin:0;"
             onsubmit="return confirm('Delete {{ name }}?')">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-danger btn-sm">&#x1F5D1;</button>
       </form>
     </div>
@@ -212,6 +211,7 @@
       <a class="btn btn-primary btn-sm" href="/update/{{ name }}">&#x2B06;</a>
       <form method="post" action="/hosts/delete/{{ name }}" style="margin:0;"
             onsubmit="return confirm('Delete {{ name }}?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-danger btn-sm">&#x1F5D1;</button>
       </form>
     </div>

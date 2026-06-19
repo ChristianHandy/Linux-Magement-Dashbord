@@ -26,6 +26,14 @@ try:
 except ImportError:
     pass  # python-dotenv is optional
 
+# ── Persistent Data Directory ───────────────────────────────────────────────────
+# All mutable data files (hosts.json, history.json, etc.) are stored in DATA_DIR.
+# This directory is preserved across git-pull updates.
+# Override via environment variable FLEETPILOT_DATA_DIR.
+_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.environ.get('FLEETPILOT_DATA_DIR', os.path.join(_APP_DIR, 'data'))
+os.makedirs(DATA_DIR, exist_ok=True)
+
 app = Flask(__name__, template_folder="templates", static_folder="static")
 # Security: Use environment variables for credentials, generate secure secret key
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
@@ -326,7 +334,7 @@ def load_hosts():
     if cached is not None:
         return cached
     try:
-        with open("hosts.json", "r") as f:
+        with open(os.path.join(DATA_DIR, "hosts.json"), "r") as f:
             raw = json.load(f)
         data = {name: normalize_host(d) for name, d in raw.items()}
     except Exception:
@@ -335,7 +343,7 @@ def load_hosts():
     return data
 
 def save_hosts(hosts):
-    with open("hosts.json", "w") as f:
+    with open(os.path.join(DATA_DIR, "hosts.json"), "w") as f:
         json.dump(hosts, f, indent=2)
     cache_invalidate('hosts')
 
@@ -428,7 +436,7 @@ def index():
     hosts = load_hosts()
     # Compute quick stats for the home page
     try:
-        history = json.load(open("history.json"))
+        history = json.load(open(os.path.join(DATA_DIR, "history.json")))
     except Exception:
         history = []
     try:
@@ -528,7 +536,7 @@ def api_dashboard_layout_reset():
 def dashboard():
     """Linux Update Dashboard"""
     hosts = load_hosts()
-    history = json.load(open("history.json"))
+    history = json.load(open(os.path.join(DATA_DIR, "history.json")))
     status = {n: is_online(h["host"], h["user"]) for n, h in hosts.items()}
     
     # Load update settings for display
@@ -1788,6 +1796,182 @@ def api_server_update_log():
     })
 
 
+# ---- FleetPilot Self-Update (git pull + pip install + service restart) ----
+
+_fp_update_running = False
+_fp_update_log = []
+_fp_update_lock = threading.Lock()
+_fp_restart_pending = False
+
+def _fp_log(msg, level='info'):
+    import datetime
+    _fp_update_log.append({'ts': datetime.datetime.now().strftime('%H:%M:%S'), 'msg': msg, 'level': level})
+
+def _run_fp_update_bg(channel, do_restart):
+    global _fp_update_running, _fp_update_log, _fp_restart_pending
+    import subprocess, datetime
+    _fp_update_log = []
+    _fp_restart_pending = False
+
+    app_dir = _APP_DIR
+
+    def run(cmd, label):
+        _fp_log(f'$ {" ".join(cmd)}')
+        try:
+            proc = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=120, cwd=app_dir
+            )
+            for line in (proc.stdout + proc.stderr).splitlines():
+                if line.strip():
+                    _fp_log(line)
+            if proc.returncode != 0:
+                _fp_log(f'{label} failed (exit {proc.returncode})', 'error')
+                return False
+            return True
+        except subprocess.TimeoutExpired:
+            _fp_log(f'{label} timed out', 'error')
+            return False
+        except Exception as e:
+            _fp_log(f'{label} error: {e}', 'error')
+            return False
+
+    _fp_log('Starting FleetPilot update…')
+    _fp_log(f'App directory: {app_dir}')
+
+    # Step 1: git fetch + check
+    run(['git', 'fetch', '--all'], 'git fetch')
+    try:
+        proc = subprocess.run(['git', 'log', 'HEAD..origin/' + channel, '--oneline'],
+                              capture_output=True, text=True, timeout=30, cwd=app_dir)
+        pending = [l for l in proc.stdout.splitlines() if l.strip()]
+        if pending:
+            _fp_log(f'Found {len(pending)} new commit(s):', 'info')
+            for c in pending[:10]:
+                _fp_log('  ' + c)
+        else:
+            _fp_log('Already up to date — no new commits on ' + channel, 'success')
+            _fp_update_running = False
+            return
+    except Exception:
+        pass
+
+    # Step 2: git pull
+    ok = run(['git', 'pull', 'origin', channel], 'git pull')
+    if not ok:
+        _fp_log('git pull failed — aborting update.', 'error')
+        _fp_update_running = False
+        return
+
+    # Step 3: pip install requirements
+    req_file = os.path.join(app_dir, 'requirements.txt')
+    if os.path.exists(req_file):
+        venv_pip = os.path.join(app_dir, 'venv', 'bin', 'pip')
+        pip_cmd = venv_pip if os.path.exists(venv_pip) else 'pip3'
+        run([pip_cmd, 'install', '-r', req_file, '-q'], 'pip install')
+    else:
+        _fp_log('No requirements.txt found — skipping pip install', 'warn')
+
+    _fp_log('✅ Code update complete!', 'success')
+
+    # Step 4: restart service
+    if do_restart:
+        _fp_log('Restarting FleetPilot service…', 'warn')
+        _fp_restart_pending = True
+        _fp_update_running = False
+        import time
+        time.sleep(1)
+        try:
+            subprocess.Popen(['sudo', 'systemctl', 'restart', 'fleetpilot'])
+        except Exception as e:
+            _fp_log(f'Could not restart service: {e}', 'error')
+        return
+    else:
+        _fp_log('Skipping service restart (manual restart required).', 'warn')
+
+    _fp_update_running = False
+
+
+@app.route('/fleetpilot_update', methods=['GET', 'POST'])
+@login_required
+def fleetpilot_update():
+    """In-app FleetPilot self-update page (git pull + pip install + restart)."""
+    global _fp_update_running, _fp_update_log, _fp_restart_pending
+    if session.get('user_id') and not current_user_has_role('admin'):
+        flash('You need admin role to update FleetPilot.', 'error')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        action = request.form.get('action', 'start')
+        if action == 'check':
+            if _fp_update_running:
+                return jsonify({'error': 'Update already running'}), 409
+            channel = request.form.get('channel', 'main')
+            with _fp_update_lock:
+                _fp_update_running = True
+                t = threading.Thread(
+                    target=_run_fp_update_bg,
+                    args=(channel, False),
+                    daemon=True
+                )
+                t.start()
+            return jsonify({'started': True})
+        elif action == 'start':
+            if _fp_update_running:
+                return jsonify({'error': 'Update already running'}), 409
+            channel = request.form.get('channel', 'main')
+            do_restart = request.form.get('after_update', 'restart') == 'restart'
+            with _fp_update_lock:
+                _fp_update_running = True
+                t = threading.Thread(
+                    target=_run_fp_update_bg,
+                    args=(channel, do_restart),
+                    daemon=True
+                )
+                t.start()
+            return jsonify({'started': True})
+        elif action == 'clear':
+            if not _fp_update_running:
+                _fp_update_log = []
+            return jsonify({'ok': True})
+
+    # GET — render page
+    import subprocess
+    try:
+        branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                                          cwd=_APP_DIR, text=True).strip()
+    except Exception:
+        branch = 'unknown'
+    try:
+        commit = subprocess.check_output(['git', 'log', '-1', '--format=%h %s'],
+                                          cwd=_APP_DIR, text=True).strip()
+    except Exception:
+        commit = 'unknown'
+    try:
+        from version_manager import get_current_version
+        cur_ver = get_current_version()
+    except Exception:
+        cur_ver = 'unknown'
+
+    return render_template('fleetpilot_update.html',
+                           running=_fp_update_running,
+                           log=_fp_update_log,
+                           current_version=cur_ver,
+                           git_branch=branch,
+                           last_commit=commit)
+
+
+@app.route('/api/fleetpilot_update_log')
+@login_required
+def api_fleetpilot_update_log():
+    """JSON polling endpoint for live FleetPilot update log."""
+    return jsonify({
+        'running': _fp_update_running,
+        'log': _fp_update_log,
+        'count': len(_fp_update_log),
+        'restart_pending': _fp_restart_pending
+    })
+
+
 # ---- UI Preference Routes ----
 
 @app.route("/set_theme", methods=["POST", "GET"])
@@ -2407,7 +2591,7 @@ import checkmk_integration as _cmk
 import secrets as _secrets_mod
 
 # API token for CheckMK (stored in a simple file, generated on first use)
-_CMK_TOKEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".checkmk_token")
+_CMK_TOKEN_FILE = os.path.join(DATA_DIR, ".checkmk_token")
 
 def _get_or_create_cmk_token() -> str:
     """Return the persistent CheckMK API token, creating it if necessary."""

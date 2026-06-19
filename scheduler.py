@@ -5,13 +5,22 @@ import os
 import email_config
 import email_notifier
 
+# Use the same DATA_DIR as app.py — resolved lazily to avoid circular imports
+def _get_data_dir():
+    _app_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.environ.get('FLEETPILOT_DATA_DIR', os.path.join(_app_dir, 'data'))
+    os.makedirs(data_dir, exist_ok=True)
+    return data_dir
+
 scheduler = BackgroundScheduler()
 
 def load_update_settings():
     """Load update settings from configuration file"""
+    data_dir = _get_data_dir()
     try:
-        if os.path.exists("update_settings.json"):
-            with open("update_settings.json", "r") as f:
+        path = os.path.join(data_dir, "update_settings.json")
+        if os.path.exists(path):
+            with open(path, "r") as f:
                 return json.load(f)
     except Exception:
         pass
@@ -24,7 +33,8 @@ def load_update_settings():
 
 def save_update_settings(settings):
     """Save update settings to configuration file"""
-    with open("update_settings.json", "w") as f:
+    data_dir = _get_data_dir()
+    with open(os.path.join(data_dir, "update_settings.json"), "w") as f:
         json.dump(settings, f, indent=2)
 
 def scheduled_updates():
@@ -34,8 +44,9 @@ def scheduled_updates():
         return
     
     # Load hosts with error handling
+    data_dir = _get_data_dir()
     try:
-        with open("hosts.json", "r") as f:
+        with open(os.path.join(data_dir, "hosts.json"), "r") as f:
             hosts = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         # No hosts configured or file is corrupted
@@ -54,16 +65,17 @@ def scheduled_email_report():
     if not email_config.get_report_enabled():
         return
     
+    data_dir = _get_data_dir()
     try:
         # Load hosts
-        with open("hosts.json", "r") as f:
+        with open(os.path.join(data_dir, "hosts.json"), "r") as f:
             hosts = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         hosts = {}
     
     # Load history
     try:
-        with open("history.json", "r") as f:
+        with open(os.path.join(data_dir, "history.json"), "r") as f:
             history = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         history = {}
