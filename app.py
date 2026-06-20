@@ -2923,7 +2923,12 @@ def commander_add():
 
         if not name or not host:
             flash('Name and host are required.', 'error')
-            return render_template('commander/add.html')
+            try:
+                from flask_wtf.csrf import generate_csrf as _gcf
+                _tok = _gcf()
+            except Exception:
+                _tok = ''
+            return render_template('commander/add.html', csrf_token_value=_tok)
 
         try:
             dev_id = corsair_commander.add_device(
@@ -2936,7 +2941,12 @@ def commander_add():
         except Exception as exc:
             flash(f'Error adding device: {exc}', 'error')
 
-    return render_template('commander/add.html')
+    try:
+        from flask_wtf.csrf import generate_csrf as _gcf
+        _tok = _gcf()
+    except Exception:
+        _tok = ''
+    return render_template('commander/add.html', csrf_token_value=_tok)
 
 
 @app.route('/commander/<int:dev_id>')

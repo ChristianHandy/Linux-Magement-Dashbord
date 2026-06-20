@@ -9,6 +9,7 @@
 <div class="card" style="max-width:680px;">
   <div class="card-header"><span class="card-title">Device Configuration</span></div>
   <form method="POST" action="/commander/add" style="padding:1.5rem;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value or csrf_token() }}">
 
     <div class="form-group">
       <label class="form-label">Device Name <span style="color:var(--danger)">*</span></label>
