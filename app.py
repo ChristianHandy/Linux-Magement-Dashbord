@@ -80,6 +80,7 @@ try:
     # Exempt pure JSON/API and SSE-stream endpoints from CSRF
     _CSRF_EXEMPT_PREFIXES = ('/api/', '/progress/', '/disks/stream', '/smart/stream',
                               '/set_language', '/set_theme')
+    _CSRF_EXEMPT_SUFFIXES = ('/set_fan', '/test', '/refresh')
 
     @_csrf.exempt
     def _csrf_exempt_check():
@@ -88,7 +89,7 @@ try:
     @app.before_request
     def _maybe_exempt_csrf():
         """Exempt API, streaming and UI-helper routes from CSRF validation."""
-        if any(request.path.startswith(p) for p in _CSRF_EXEMPT_PREFIXES):
+        if any(request.path.startswith(p) for p in _CSRF_EXEMPT_PREFIXES) or any(request.path.endswith(s) for s in _CSRF_EXEMPT_SUFFIXES):
             # Disable CSRF check for this request by setting the flag Flask-WTF reads
             app.config['WTF_CSRF_ENABLED'] = False
 
@@ -3009,6 +3010,7 @@ def commander_delete(dev_id):
 
 
 @app.route('/commander/<int:dev_id>/refresh')
+@_csrf.exempt
 @login_required
 def commander_refresh(dev_id):
     """Trigger an immediate status poll and redirect to detail page."""
@@ -3023,6 +3025,7 @@ def commander_refresh(dev_id):
 
 
 @app.route('/commander/<int:dev_id>/test')
+@_csrf.exempt
 @login_required
 def commander_test(dev_id):
     """Test SSH + liquidctl connectivity."""
@@ -3032,6 +3035,7 @@ def commander_test(dev_id):
 
 @app.route('/commander/<int:dev_id>/set_fan', methods=['POST'])
 @login_required
+@_csrf.exempt
 def commander_set_fan(dev_id):
     """Set fan speed on a Commander Pro device."""
     dev = corsair_commander.get_device(dev_id)
