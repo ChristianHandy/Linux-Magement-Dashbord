@@ -1185,3 +1185,242 @@ def start_polling():
 def stop_polling():
     global _poll_running
     _poll_running = False
+
+
+# ── Auto-Detect ───────────────────────────────────────────────────────────────
+
+def detect_controllers(host: str, port: int = 22, username: str = "root",
+                       password: str = "", ssh_key: str = "") -> Dict:
+    """
+    Connect to a remote host via SSH and detect which fan controller tools
+    are available. Returns a ranked list of suggestions with detected devices.
+
+    Returns:
+        {
+          "ok": bool,
+          "error": str | None,
+          "host": str,
+          "os": str,
+          "hostname": str,
+          "is_laptop": bool,
+          "suggestions": [
+              {
+                "controller_type": str,
+                "label": str,
+                "icon": str,
+                "confidence": "high"|"medium"|"low",
+                "reason": str,
+                "detected_devices": str,
+                "extra_config": dict,
+              },
+              ...
+          ]
+        }
+    """
+    dev = {
+        "host": host,
+        "port": port,
+        "username": username,
+        "password_plain": password,
+        "ssh_key": ssh_key,
+    }
+
+    result = {
+        "ok": False,
+        "error": None,
+        "host": host,
+        "os": "",
+        "hostname": "",
+        "is_laptop": False,
+        "suggestions": [],
+    }
+
+    ssh = None
+    try:
+        ssh = _ssh_connect(dev)
+
+        def _r(cmd, timeout=10):
+            out, err, code = _run_remote(ssh, cmd, timeout=timeout)
+            return (out or "").strip(), (err or "").strip(), code
+
+        # ── Gather system info ────────────────────────────────────────────────
+        hostname_out, _, _ = _r("hostname 2>/dev/null")
+        result["hostname"] = hostname_out
+
+        os_out, _, _ = _r("cat /etc/os-release 2>/dev/null | grep -E '^PRETTY_NAME=' | head -1")
+        result["os"] = os_out.replace('PRETTY_NAME=', '').strip('"\'') or "Linux"
+
+        # Detect if laptop (battery present)
+        bat_out, _, bat_code = _r("ls /sys/class/power_supply/ 2>/dev/null | grep -iE 'BAT|battery'")
+        result["is_laptop"] = (bat_code == 0 and bool(bat_out))
+
+        # Detect chassis type via DMI
+        chassis_out, _, _ = _r("cat /sys/class/dmi/id/chassis_type 2>/dev/null")
+        chassis_type = chassis_out.strip()
+        # Chassis types 8-11 are laptops/notebooks
+        if chassis_type in ("8", "9", "10", "11", "14"):
+            result["is_laptop"] = True
+
+        # ── Check each tool ───────────────────────────────────────────────────
+        suggestions = []
+
+        # 1. liquidctl
+        lc_ver, _, lc_code = _r("liquidctl --version 2>&1 | head -1")
+        if lc_code == 0 and lc_ver:
+            lc_list, _, _ = _r("liquidctl list --json 2>/dev/null || liquidctl list 2>&1 | head -20", timeout=15)
+            # Parse device names from JSON or text
+            devices_found = []
+            try:
+                devs = json.loads(lc_list)
+                if isinstance(devs, list):
+                    devices_found = [d.get("description", d.get("device", "")) for d in devs]
+            except (json.JSONDecodeError, TypeError):
+                for line in lc_list.splitlines():
+                    if "Device" in line or "#" in line:
+                        devices_found.append(line.strip())
+
+            if devices_found:
+                # Determine best match string
+                match_str = ""
+                for d in devices_found:
+                    for keyword in ["Commander", "Smart Device", "Kraken", "Quadro", "Octo", "HUE"]:
+                        if keyword.lower() in d.lower():
+                            match_str = keyword
+                            break
+                    if match_str:
+                        break
+
+                suggestions.append({
+                    "controller_type": "liquidctl",
+                    "label": CONTROLLER_TYPES["liquidctl"]["label"],
+                    "icon": CONTROLLER_TYPES["liquidctl"]["icon"],
+                    "confidence": "high",
+                    "reason": f"liquidctl {lc_ver} found with {len(devices_found)} device(s)",
+                    "detected_devices": "\n".join(devices_found[:5]),
+                    "extra_config": {"match_str": match_str, "use_direct": False},
+                })
+            else:
+                suggestions.append({
+                    "controller_type": "liquidctl",
+                    "label": CONTROLLER_TYPES["liquidctl"]["label"],
+                    "icon": CONTROLLER_TYPES["liquidctl"]["icon"],
+                    "confidence": "medium",
+                    "reason": f"liquidctl {lc_ver} installed but no devices listed (may need --direct-access or udev rules)",
+                    "detected_devices": lc_list[:300],
+                    "extra_config": {"match_str": "", "use_direct": True},
+                })
+
+        # 2. lm-sensors
+        sensors_ver, _, sensors_code = _r("sensors --version 2>&1 | head -1")
+        if sensors_code == 0:
+            sensors_out, _, _ = _r("sensors 2>/dev/null | head -30")
+            fan_count = len(re.findall(r"RPM", sensors_out, re.IGNORECASE))
+            temp_count = len(re.findall(r"°C", sensors_out))
+            pwm_out, _, _ = _r("ls /sys/class/hwmon/hwmon*/pwm[0-9] 2>/dev/null | wc -l")
+            pwm_count = int(pwm_out.strip() or "0")
+
+            suggestions.append({
+                "controller_type": "lm_sensors",
+                "label": CONTROLLER_TYPES["lm_sensors"]["label"],
+                "icon": CONTROLLER_TYPES["lm_sensors"]["icon"],
+                "confidence": "high" if (fan_count > 0 or pwm_count > 0) else "medium",
+                "reason": f"lm-sensors installed: {temp_count} temp sensor(s), {fan_count} fan(s), {pwm_count} PWM channel(s)",
+                "detected_devices": sensors_out[:400],
+                "extra_config": {},
+            })
+
+        # 3. PWM sysfs (always check)
+        pwm_nodes_out, _, _ = _r(
+            "for h in /sys/class/hwmon/hwmon*; do "
+            "name=$(cat $h/name 2>/dev/null); "
+            "pwms=$(ls $h/pwm[0-9] 2>/dev/null | wc -l); "
+            "[ \"$pwms\" -gt 0 ] && echo \"$name: $pwms PWM channel(s)\"; "
+            "done 2>/dev/null"
+        )
+        if pwm_nodes_out:
+            suggestions.append({
+                "controller_type": "pwm_sysfs",
+                "label": CONTROLLER_TYPES["pwm_sysfs"]["label"],
+                "icon": CONTROLLER_TYPES["pwm_sysfs"]["icon"],
+                "confidence": "high",
+                "reason": "Direct PWM sysfs nodes found (no extra tool needed)",
+                "detected_devices": pwm_nodes_out[:300],
+                "extra_config": {},
+            })
+
+        # 4. IPMI
+        ipmi_ver, _, ipmi_code = _r("ipmitool -V 2>&1 | head -1")
+        if ipmi_code == 0:
+            ipmi_fans, _, _ = _r("ipmitool sdr type Fan 2>&1 | head -10", timeout=20)
+            fan_count_ipmi = len([l for l in ipmi_fans.splitlines() if "|" in l])
+            # Detect vendor
+            dmi_vendor, _, _ = _r("cat /sys/class/dmi/id/sys_vendor 2>/dev/null")
+            vendor = "generic"
+            if "dell" in dmi_vendor.lower():
+                vendor = "dell"
+            elif "hp" in dmi_vendor.lower() or "hewlett" in dmi_vendor.lower():
+                vendor = "hp"
+            elif "supermicro" in dmi_vendor.lower():
+                vendor = "supermicro"
+
+            suggestions.append({
+                "controller_type": "ipmi",
+                "label": CONTROLLER_TYPES["ipmi"]["label"],
+                "icon": CONTROLLER_TYPES["ipmi"]["icon"],
+                "confidence": "high" if fan_count_ipmi > 0 else "medium",
+                "reason": f"ipmitool found ({vendor} vendor), {fan_count_ipmi} fan sensor(s) via IPMI",
+                "detected_devices": ipmi_fans[:300],
+                "extra_config": {"ipmi_host": "localhost", "ipmi_user": "ADMIN", "ipmi_pass": "", "vendor": vendor},
+            })
+
+        # 5. nbfc (laptops)
+        nbfc_ver, _, nbfc_code = _r("nbfc status --version 2>&1 | head -1 || nbfc --version 2>&1 | head -1")
+        if nbfc_code == 0 or result["is_laptop"]:
+            nbfc_status, _, _ = _r("nbfc status -a 2>&1 | head -20")
+            confidence = "high" if nbfc_code == 0 else "low"
+            reason = (
+                f"nbfc-linux installed, {len([l for l in nbfc_status.splitlines() if 'Fan' in l])} fan(s) detected"
+                if nbfc_code == 0
+                else "Laptop detected but nbfc-linux not installed — install from https://github.com/nbfc-linux/nbfc-linux"
+            )
+            suggestions.append({
+                "controller_type": "nbfc",
+                "label": CONTROLLER_TYPES["nbfc"]["label"],
+                "icon": CONTROLLER_TYPES["nbfc"]["icon"],
+                "confidence": confidence,
+                "reason": reason,
+                "detected_devices": nbfc_status[:300] if nbfc_code == 0 else "",
+                "extra_config": {},
+            })
+
+        # ── If nothing found, suggest based on OS/hardware ────────────────────
+        if not suggestions:
+            # Always suggest lm_sensors for Linux
+            suggestions.append({
+                "controller_type": "lm_sensors",
+                "label": CONTROLLER_TYPES["lm_sensors"]["label"],
+                "icon": CONTROLLER_TYPES["lm_sensors"]["icon"],
+                "confidence": "low",
+                "reason": "No fan control tools detected. Install lm-sensors for basic fan monitoring.",
+                "detected_devices": "",
+                "extra_config": {},
+            })
+
+        # ── Sort: high > medium > low, then liquidctl first if present ────────
+        order = {"high": 0, "medium": 1, "low": 2}
+        suggestions.sort(key=lambda s: order.get(s["confidence"], 3))
+
+        result["suggestions"] = suggestions
+        result["ok"] = True
+
+    except Exception as exc:
+        result["error"] = str(exc)
+        logger.warning("[fan_controller] detect_controllers error for %s: %s", host, exc)
+    finally:
+        if ssh:
+            try:
+                ssh.close()
+            except Exception:
+                pass
+
+    return result

@@ -3350,3 +3350,33 @@ def api_fc_history(dev_id):
 @login_required
 def api_fc_types():
     return jsonify(_fc.CONTROLLER_TYPES)
+
+
+# ── Fan Controller Auto-Detect ────────────────────────────────────────────────
+
+@app.route('/fans/detect')
+@login_required
+@_csrf.exempt
+def fc_detect():
+    """
+    Auto-detect available fan controllers on a remote host via SSH.
+    Query params: host, port, username, password, ssh_key
+    Returns JSON with ranked suggestions.
+    """
+    host = request.args.get('host', '').strip()
+    if not host:
+        return jsonify({'ok': False, 'error': 'host parameter required'}), 400
+
+    port = int(request.args.get('port', 22) or 22)
+    username = request.args.get('username', 'root').strip()
+    password = request.args.get('password', '').strip()
+    ssh_key = request.args.get('ssh_key', '').strip()
+
+    result = _fc.detect_controllers(
+        host=host,
+        port=port,
+        username=username,
+        password=password,
+        ssh_key=ssh_key,
+    )
+    return jsonify(result)

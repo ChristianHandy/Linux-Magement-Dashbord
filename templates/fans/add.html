@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Add Fan Controller{% endblock %}
 {% block content %}
-<div class="container py-4" style="max-width:720px">
+<div class="container py-4" style="max-width:760px">
 
   <div class="d-flex align-items-center mb-3">
     <a href="/fans" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-arrow-left"></i></a>
@@ -14,163 +14,400 @@
     {% endfor %}
   {% endwith %}
 
-  <form method="POST" action="/fans/add" id="addForm">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}">
+  <!-- ── Step 1: SSH Connection + Auto-Detect ─────────────────────────────── -->
+  <div class="card mb-3" id="sshCard">
+    <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-hdd-network me-1"></i>SSH Connection</span>
+      <button type="button" class="btn btn-primary btn-sm" id="detectBtn" onclick="runDetect()">
+        <i class="bi bi-search me-1"></i>Auto-Detect Controllers
+      </button>
+    </div>
+    <div class="card-body">
+      <div class="row g-2 mb-3">
+        <div class="col-9">
+          <label class="form-label">Host / IP <span class="text-danger">*</span></label>
+          <input type="text" id="d_host" class="form-control" placeholder="192.168.1.100"
+                 onkeydown="if(event.key==='Enter'){runDetect();event.preventDefault();}">
+        </div>
+        <div class="col-3">
+          <label class="form-label">SSH Port</label>
+          <input type="number" id="d_port" class="form-control" value="22">
+        </div>
+      </div>
+      <div class="row g-2 mb-2">
+        <div class="col-6">
+          <label class="form-label">Username</label>
+          <input type="text" id="d_user" class="form-control" value="root">
+        </div>
+        <div class="col-6">
+          <label class="form-label">Password</label>
+          <input type="password" id="d_pass" class="form-control" placeholder="SSH password"
+                 onkeydown="if(event.key==='Enter'){runDetect();event.preventDefault();}">
+        </div>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">SSH Key Path <span class="text-muted small">(optional)</span></label>
+        <input type="text" id="d_key" class="form-control" placeholder="/root/.ssh/id_rsa">
+      </div>
 
-    <!-- Basic info -->
+      <!-- Detect status -->
+      <div id="detectStatus" class="mt-3" style="display:none">
+        <div id="detectSpinner" class="d-flex align-items-center gap-2 text-muted">
+          <span class="spinner-border spinner-border-sm"></span>
+          <span>Connecting and scanning for fan controllers…</span>
+        </div>
+        <div id="detectError" class="alert alert-danger mt-2" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Step 2: Detection Results ────────────────────────────────────────── -->
+  <div id="detectResults" style="display:none" class="mb-3">
+    <h6 class="text-muted mb-2">
+      <i class="bi bi-check2-circle me-1 text-success"></i>
+      Detected on <span id="detectedHost" class="fw-semibold"></span>
+      <span id="detectedOS" class="badge bg-secondary ms-2"></span>
+      <span id="detectedLaptop" class="badge bg-info ms-1" style="display:none">Laptop</span>
+    </h6>
+    <div id="suggestionCards" class="row g-2 mb-3"></div>
+  </div>
+
+  <!-- ── Step 3: Device Form ───────────────────────────────────────────────── -->
+  <form method="POST" action="/fans/add" id="addForm" style="display:none">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token_value }}">
+    <input type="hidden" name="host" id="f_host">
+    <input type="hidden" name="port" id="f_port">
+    <input type="hidden" name="username" id="f_username">
+    <input type="hidden" name="password" id="f_password">
+    <input type="hidden" name="ssh_key" id="f_ssh_key">
+    <!-- Extra config fields (populated by JS) -->
+    <input type="hidden" name="match_str" id="f_match_str">
+    <input type="hidden" name="ipmi_host" id="f_ipmi_host">
+    <input type="hidden" name="ipmi_user" id="f_ipmi_user">
+    <input type="hidden" name="ipmi_pass" id="f_ipmi_pass">
+    <input type="hidden" name="vendor" id="f_vendor">
+    <input type="hidden" name="use_direct" id="f_use_direct">
+
     <div class="card mb-3">
-      <div class="card-header fw-semibold">Device Information</div>
+      <div class="card-header fw-semibold">Device Details</div>
       <div class="card-body">
         <div class="mb-3">
           <label class="form-label">Display Name <span class="text-danger">*</span></label>
-          <input type="text" name="name" class="form-control" placeholder="e.g. gaming-pc-fans" required>
+          <input type="text" name="name" id="f_name" class="form-control"
+                 placeholder="e.g. gaming-pc-fans" required>
         </div>
         <div class="mb-3">
-          <label class="form-label">Controller Type <span class="text-danger">*</span></label>
-          <select name="controller_type" id="ctypeSelect" class="form-select" onchange="updateTypeUI()">
+          <label class="form-label">Controller Type</label>
+          <select name="controller_type" id="f_ctype" class="form-select" onchange="updateTypeUI()">
             {% for key, info in controller_types.items() %}
             <option value="{{ key }}">{{ info.icon }} {{ info.label }}</option>
             {% endfor %}
           </select>
-          <div id="typeDesc" class="form-text mt-1"></div>
+          <div id="typeDesc" class="form-text mt-1 text-muted"></div>
         </div>
-        <div class="mb-3">
+        <div class="mb-2">
           <label class="form-label">Notes</label>
           <input type="text" name="notes" class="form-control" placeholder="Optional description">
         </div>
       </div>
     </div>
 
-    <!-- SSH connection -->
-    <div class="card mb-3">
-      <div class="card-header fw-semibold">SSH Connection</div>
-      <div class="card-body">
-        <div class="row g-2 mb-3">
-          <div class="col-9">
-            <label class="form-label">Host / IP <span class="text-danger">*</span></label>
-            <input type="text" name="host" class="form-control" placeholder="192.168.1.100" required>
-          </div>
-          <div class="col-3">
-            <label class="form-label">SSH Port</label>
-            <input type="number" name="port" class="form-control" value="22" min="1" max="65535">
-          </div>
-        </div>
-        <div class="row g-2 mb-3">
-          <div class="col-6">
-            <label class="form-label">Username</label>
-            <input type="text" name="username" class="form-control" value="root">
-          </div>
-          <div class="col-6">
-            <label class="form-label">Password</label>
-            <input type="password" name="password" class="form-control" placeholder="SSH password">
-          </div>
-        </div>
-        <div class="mb-2">
-          <label class="form-label">SSH Key Path (optional)</label>
-          <input type="text" name="ssh_key" class="form-control" placeholder="/root/.ssh/id_rsa">
-          <div class="form-text">Leave blank to use password authentication.</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Type-specific options -->
+    <!-- Type-specific options (shown for manual override) -->
     <div class="card mb-3" id="extraCard">
-      <div class="card-header fw-semibold">Controller Options</div>
-      <div class="card-body" id="extraFields">
-        <!-- Populated by JS -->
+      <div class="card-header fw-semibold d-flex justify-content-between">
+        <span>Controller Options</span>
+        <span class="badge bg-secondary" id="extraTypeBadge"></span>
       </div>
+      <div class="card-body" id="extraFields"></div>
     </div>
 
     <div class="d-flex gap-2">
       <button type="submit" class="btn btn-success">
         <i class="bi bi-plus-circle me-1"></i>Add Device
       </button>
-      <a href="/fans" class="btn btn-outline-secondary">Cancel</a>
+      <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
+        <i class="bi bi-arrow-counterclockwise me-1"></i>Start Over
+      </button>
     </div>
   </form>
+
+  <!-- Manual add link (always visible) -->
+  <div class="mt-3 text-center">
+    <button class="btn btn-link btn-sm text-muted" onclick="showManualForm()">
+      <i class="bi bi-pencil me-1"></i>Add manually without auto-detect
+    </button>
+  </div>
+
 </div>
 
 <script>
 const TYPES = {{ controller_types | tojson }};
+const CONFIDENCE_COLORS = {high: 'success', medium: 'warning', low: 'secondary'};
+const CONFIDENCE_ICONS  = {high: '✅', medium: '⚠️', low: '❓'};
 
+// ── Auto-Detect ───────────────────────────────────────────────────────────────
+function runDetect() {
+  const host = document.getElementById('d_host').value.trim();
+  if (!host) {
+    document.getElementById('d_host').focus();
+    return;
+  }
+  const port = document.getElementById('d_port').value || '22';
+  const user = document.getElementById('d_user').value || 'root';
+  const pass = document.getElementById('d_pass').value || '';
+  const key  = document.getElementById('d_key').value || '';
+
+  const btn = document.getElementById('detectBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Detecting…';
+
+  document.getElementById('detectStatus').style.display = '';
+  document.getElementById('detectSpinner').style.display = '';
+  document.getElementById('detectError').style.display = 'none';
+  document.getElementById('detectResults').style.display = 'none';
+  document.getElementById('addForm').style.display = 'none';
+
+  const params = new URLSearchParams({host, port, username: user, password: pass, ssh_key: key});
+  fetch('/fans/detect?' + params.toString())
+    .then(r => r.json())
+    .then(data => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-search me-1"></i>Auto-Detect Controllers';
+      document.getElementById('detectSpinner').style.display = 'none';
+
+      if (!data.ok) {
+        document.getElementById('detectError').style.display = '';
+        document.getElementById('detectError').textContent = '✘ ' + (data.error || 'Detection failed');
+        return;
+      }
+
+      // Show results
+      document.getElementById('detectedHost').textContent = data.host;
+      document.getElementById('detectedOS').textContent = data.os || 'Linux';
+      if (data.hostname) document.getElementById('detectedHost').textContent += ' (' + data.hostname + ')';
+      const laptopBadge = document.getElementById('detectedLaptop');
+      laptopBadge.style.display = data.is_laptop ? '' : 'none';
+
+      renderSuggestions(data.suggestions, host, port, user, pass, key);
+      document.getElementById('detectResults').style.display = '';
+    })
+    .catch(e => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-search me-1"></i>Auto-Detect Controllers';
+      document.getElementById('detectSpinner').style.display = 'none';
+      document.getElementById('detectError').style.display = '';
+      document.getElementById('detectError').textContent = '✘ Network error: ' + e;
+    });
+}
+
+function renderSuggestions(suggestions, host, port, user, pass, key) {
+  const container = document.getElementById('suggestionCards');
+  container.innerHTML = '';
+
+  if (!suggestions || !suggestions.length) {
+    container.innerHTML = '<div class="col-12"><div class="alert alert-warning">No fan controllers detected. You can still add one manually.</div></div>';
+    showManualForm(host, port, user, pass, key);
+    return;
+  }
+
+  suggestions.forEach((s, idx) => {
+    const color = CONFIDENCE_COLORS[s.confidence] || 'secondary';
+    const icon  = CONFIDENCE_ICONS[s.confidence] || '';
+    const isFirst = idx === 0;
+
+    const col = document.createElement('div');
+    col.className = 'col-12';
+    col.innerHTML = `
+      <div class="card border-${color} ${isFirst ? 'shadow-sm' : ''}" style="cursor:pointer"
+           onclick="selectSuggestion(${idx})" id="suggCard_${idx}">
+        <div class="card-body py-2 px-3">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <span class="fs-5 me-1">${s.icon}</span>
+              <strong>${s.label}</strong>
+              <span class="badge bg-${color} ms-2">${icon} ${s.confidence} confidence</span>
+              ${isFirst ? '<span class="badge bg-primary ms-1">Recommended</span>' : ''}
+            </div>
+            <button class="btn btn-sm btn-${color}" onclick="event.stopPropagation();selectSuggestion(${idx})">
+              Use This
+            </button>
+          </div>
+          <div class="text-muted small mt-1">${s.reason}</div>
+          ${s.detected_devices ? `
+            <details class="mt-1">
+              <summary class="small text-muted" style="cursor:pointer">Show detected devices</summary>
+              <pre class="small bg-dark text-light p-2 rounded mt-1 mb-0" style="max-height:120px;overflow-y:auto">${escHtml(s.detected_devices)}</pre>
+            </details>` : ''}
+        </div>
+      </div>`;
+    container.appendChild(col);
+  });
+
+  // Auto-select first (highest confidence)
+  selectSuggestion(0, host, port, user, pass, key, suggestions);
+}
+
+let _lastSuggestions = [];
+let _lastConn = {};
+
+function selectSuggestion(idx, host, port, user, pass, key, suggestions) {
+  // Use stored values if not passed
+  if (host !== undefined) {
+    _lastConn = {host, port, user, pass, key};
+    _lastSuggestions = suggestions;
+  }
+  const s = _lastSuggestions[idx];
+  if (!s) return;
+
+  // Highlight selected card
+  document.querySelectorAll('[id^="suggCard_"]').forEach(c => {
+    c.classList.remove('border-primary', 'shadow');
+  });
+  const card = document.getElementById('suggCard_' + idx);
+  if (card) {
+    card.classList.add('border-primary', 'shadow');
+  }
+
+  // Populate form
+  const c = _lastConn;
+  document.getElementById('f_host').value     = c.host || document.getElementById('d_host').value;
+  document.getElementById('f_port').value     = c.port || document.getElementById('d_port').value;
+  document.getElementById('f_username').value = c.user || document.getElementById('d_user').value;
+  document.getElementById('f_password').value = c.pass || document.getElementById('d_pass').value;
+  document.getElementById('f_ssh_key').value  = c.key  || document.getElementById('d_key').value;
+
+  // Set controller type
+  const sel = document.getElementById('f_ctype');
+  sel.value = s.controller_type;
+  updateTypeUI();
+
+  // Set extra config
+  const extra = s.extra_config || {};
+  document.getElementById('f_match_str').value  = extra.match_str  || '';
+  document.getElementById('f_ipmi_host').value  = extra.ipmi_host  || 'localhost';
+  document.getElementById('f_ipmi_user').value  = extra.ipmi_user  || 'ADMIN';
+  document.getElementById('f_ipmi_pass').value  = extra.ipmi_pass  || '';
+  document.getElementById('f_vendor').value     = extra.vendor     || 'generic';
+  document.getElementById('f_use_direct').value = extra.use_direct ? '1' : '0';
+
+  // Suggest a name
+  const nameField = document.getElementById('f_name');
+  if (!nameField.value) {
+    const hostShort = (c.host || document.getElementById('d_host').value).replace(/\./g, '-');
+    nameField.value = hostShort + '-' + s.controller_type.replace('_', '-');
+  }
+
+  document.getElementById('addForm').style.display = '';
+  document.getElementById('addForm').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+function showManualForm(host, port, user, pass, key) {
+  if (host) {
+    document.getElementById('f_host').value     = host;
+    document.getElementById('f_port').value     = port || '22';
+    document.getElementById('f_username').value = user || 'root';
+    document.getElementById('f_password').value = pass || '';
+    document.getElementById('f_ssh_key').value  = key  || '';
+  } else {
+    document.getElementById('f_host').value     = document.getElementById('d_host').value;
+    document.getElementById('f_port').value     = document.getElementById('d_port').value;
+    document.getElementById('f_username').value = document.getElementById('d_user').value;
+    document.getElementById('f_password').value = document.getElementById('d_pass').value;
+    document.getElementById('f_ssh_key').value  = document.getElementById('d_key').value;
+  }
+  updateTypeUI();
+  document.getElementById('addForm').style.display = '';
+  document.getElementById('addForm').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+function resetForm() {
+  document.getElementById('detectResults').style.display = 'none';
+  document.getElementById('addForm').style.display = 'none';
+  document.getElementById('detectStatus').style.display = 'none';
+  document.getElementById('f_name').value = '';
+  _lastSuggestions = [];
+  _lastConn = {};
+  document.getElementById('d_host').focus();
+}
+
+// ── Type-specific extra fields ────────────────────────────────────────────────
 function updateTypeUI() {
-  const sel = document.getElementById('ctypeSelect');
-  const key = sel.value;
+  const key = document.getElementById('f_ctype').value;
   const info = TYPES[key] || {};
   document.getElementById('typeDesc').textContent = info.description || '';
+  document.getElementById('extraTypeBadge').textContent = info.label || key;
 
   const ef = document.getElementById('extraFields');
   ef.innerHTML = '';
 
   if (key === 'liquidctl') {
+    const matchVal = document.getElementById('f_match_str').value;
+    const directVal = document.getElementById('f_use_direct').value;
     ef.innerHTML = `
       <div class="mb-3">
         <label class="form-label">Device Match String</label>
-        <input type="text" name="match_str" class="form-control" placeholder="e.g. Smart Device, Kraken, Quadro">
-        <div class="form-text">Passed to <code>liquidctl --match</code>. Leave blank to use the first detected device.</div>
+        <input type="text" name="match_str" class="form-control" value="${escHtml(matchVal)}"
+               placeholder="Commander, Smart Device, Kraken, Quadro…"
+               oninput="document.getElementById('f_match_str').value=this.value">
+        <div class="form-text">Passed to <code>liquidctl --match</code>. Leave blank for first detected device.</div>
       </div>
       <div class="form-check">
-        <input class="form-check-input" type="checkbox" name="use_direct" value="1" id="useDirectChk">
+        <input class="form-check-input" type="checkbox" name="use_direct" value="1"
+               id="useDirectChk" ${directVal === '1' ? 'checked' : ''}
+               onchange="document.getElementById('f_use_direct').value=this.checked?'1':'0'">
         <label class="form-check-label" for="useDirectChk">
           Use <code>--direct-access</code> (needed if kernel driver is loaded)
         </label>
       </div>`;
   } else if (key === 'ipmi') {
+    const ih = document.getElementById('f_ipmi_host').value || 'localhost';
+    const iu = document.getElementById('f_ipmi_user').value || 'ADMIN';
+    const iv = document.getElementById('f_vendor').value || 'generic';
     ef.innerHTML = `
       <div class="mb-3">
         <label class="form-label">IPMI Host</label>
-        <input type="text" name="ipmi_host" class="form-control" value="localhost"
-               placeholder="localhost or BMC IP (e.g. 192.168.1.200)">
-        <div class="form-text">Use <code>localhost</code> for local IPMI via /dev/ipmi0, or enter the BMC/iDRAC/iLO IP for remote IPMI.</div>
+        <input type="text" name="ipmi_host" class="form-control" value="${escHtml(ih)}"
+               oninput="document.getElementById('f_ipmi_host').value=this.value">
+        <div class="form-text">Use <code>localhost</code> for local IPMI, or enter BMC/iDRAC/iLO IP.</div>
       </div>
       <div class="row g-2 mb-2">
         <div class="col-6">
           <label class="form-label">IPMI Username</label>
-          <input type="text" name="ipmi_user" class="form-control" value="ADMIN">
+          <input type="text" name="ipmi_user" class="form-control" value="${escHtml(iu)}"
+                 oninput="document.getElementById('f_ipmi_user').value=this.value">
         </div>
         <div class="col-6">
           <label class="form-label">IPMI Password</label>
-          <input type="password" name="ipmi_pass" class="form-control" placeholder="ADMIN">
+          <input type="password" name="ipmi_pass" class="form-control" placeholder="ADMIN"
+                 oninput="document.getElementById('f_ipmi_pass').value=this.value">
         </div>
       </div>
       <div class="mb-2">
         <label class="form-label">Server Vendor</label>
-        <select name="vendor" class="form-select">
-          <option value="generic">Generic</option>
-          <option value="dell">Dell (iDRAC)</option>
-          <option value="hp">HP (iLO)</option>
-          <option value="supermicro">Supermicro</option>
+        <select name="vendor" class="form-select"
+                onchange="document.getElementById('f_vendor').value=this.value">
+          <option value="generic" ${iv==='generic'?'selected':''}>Generic</option>
+          <option value="dell"    ${iv==='dell'?'selected':''}>Dell (iDRAC)</option>
+          <option value="hp"      ${iv==='hp'?'selected':''}>HP (iLO)</option>
+          <option value="supermicro" ${iv==='supermicro'?'selected':''}>Supermicro</option>
         </select>
-        <div class="form-text">Vendor-specific IPMI fan control commands will be used.</div>
       </div>`;
   } else if (key === 'nbfc') {
     ef.innerHTML = `
       <div class="alert alert-info mb-0">
-        <strong>nbfc-linux</strong> must be installed and configured on the target laptop.<br>
-        <a href="https://github.com/nbfc-linux/nbfc-linux" target="_blank" rel="noopener">
-          Installation guide →
-        </a><br>
+        <strong>nbfc-linux</strong> must be installed on the target laptop.<br>
         Use the <strong>Install Packages</strong> button on the device detail page to attempt automatic installation.
       </div>`;
-  } else if (key === 'pwm_sysfs') {
-    ef.innerHTML = `
-      <div class="alert alert-secondary mb-0">
-        <strong>Direct PWM sysfs control</strong> — no extra tool needed.<br>
-        Fan channels are auto-detected from <code>/sys/class/hwmon/hwmon*/pwm*</code>.<br>
-        Root access is required to write PWM values.
-      </div>`;
   } else {
-    // lm_sensors
-    ef.innerHTML = `
-      <div class="alert alert-secondary mb-0">
-        <strong>lm-sensors</strong> reads temperatures and fan RPMs.<br>
-        <strong>fancontrol / pwmconfig</strong> is used for PWM fan speed control.<br>
-        Use the <strong>Install Packages</strong> button on the device detail page to install automatically.
-      </div>`;
+    ef.innerHTML = `<div class="text-muted small">No additional options required for this controller type.</div>`;
   }
 }
 
-// Init on page load
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Init
 updateTypeUI();
 </script>
 {% endblock %}
