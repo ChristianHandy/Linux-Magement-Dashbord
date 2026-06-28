@@ -53,13 +53,16 @@
     </div>
     <div class="btn-group">
       <button class="btn btn-primary" id="startBtn" onclick="startUpdate()">
-        ▶ {{ _('Start Update') }}
+        &#9654; {{ _('Start Update') }}
       </button>
       <button class="btn btn-secondary" onclick="checkUpdates()">
         🔍 {{ _('Check for Updates Only') }}
       </button>
       <button class="btn btn-ghost" onclick="clearLog()">
         🗑 {{ _('Clear Log') }}
+      </button>
+      <button class="btn btn-danger" id="rebootBtn" onclick="rebootServer()" style="margin-left:auto;">
+        🔁 {{ _('Reboot Server') }}
       </button>
     </div>
   </div>
@@ -263,6 +266,55 @@ function escapeHtml(str) {
 
 if (isRunning) {
   startPolling();
+}
+
+function rebootServer() {
+  const pw = document.getElementById('sudoPassword').value;
+  if (!pw) {
+    alert('{{ _("Please enter the sudo password before rebooting.") }}');
+    document.getElementById('sudoPassword').focus();
+    return;
+  }
+  if (!confirm('{{ _("Are you sure you want to reboot this server? FleetPilot will be unavailable for 1-2 minutes.") }}')) return;
+
+  document.getElementById('rebootBtn').disabled = true;
+  document.getElementById('rebootBtn').textContent = '⏳ {{ _("Rebooting…") }}';
+
+  const fd = new FormData();
+  fd.append('action', 'reboot');
+  fd.append('sudo_password', pw);
+
+  fetch('/server_update', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+      if (data.rebooting) {
+        document.getElementById('logContainer').innerHTML = '';
+        const div = document.createElement('div');
+        div.className = 'log-line log-warn';
+        div.innerHTML = '<span style="color:var(--text-muted)">--:--:--</span> <span>🔁 Reboot command sent. Server will restart shortly. This page will auto-reload in 60 seconds…</span>';
+        document.getElementById('logContainer').appendChild(div);
+        document.getElementById('statusBadge').innerHTML = '<span class="badge badge-amber">{{ _("Rebooting") }}</span>';
+        // Auto-reload after 60s to check if server is back
+        let countdown = 60;
+        const timer = setInterval(() => {
+          countdown--;
+          document.getElementById('rebootBtn').textContent = '⏳ {{ _("Rebooting…") }} (' + countdown + 's)';
+          if (countdown <= 0) {
+            clearInterval(timer);
+            window.location.reload();
+          }
+        }, 1000);
+      } else {
+        alert(data.error || '{{ _("Reboot failed.") }}');
+        document.getElementById('rebootBtn').disabled = false;
+        document.getElementById('rebootBtn').textContent = '🔁 {{ _("Reboot Server") }}';
+      }
+    })
+    .catch(() => {
+      // Connection lost = reboot likely started
+      document.getElementById('rebootBtn').textContent = '⏳ {{ _("Rebooting…") }}';
+      setTimeout(() => window.location.reload(), 60000);
+    });
 }
 </script>
 {% endblock %}

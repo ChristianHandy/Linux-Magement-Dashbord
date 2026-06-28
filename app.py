@@ -1789,6 +1789,27 @@ def server_update():
             if not _server_update_running:
                 _server_update_log = []
             return jsonify({'ok': True})
+        elif action == 'reboot':
+            sudo_pw = request.form.get('sudo_password', '')
+            if not sudo_pw:
+                return jsonify({'error': 'Sudo password required for reboot'}), 400
+            import subprocess, threading
+            def _do_reboot():
+                import time
+                time.sleep(2)  # Give the HTTP response time to reach the browser
+                try:
+                    proc = subprocess.Popen(
+                        ['sudo', '-S', 'reboot'],
+                        stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT
+                    )
+                    proc.communicate(input=(sudo_pw + '\n').encode(), timeout=10)
+                except Exception:
+                    pass
+            t = threading.Thread(target=_do_reboot, daemon=True)
+            t.start()
+            return jsonify({'rebooting': True})
 
     return render_template('server_update.html',
                            running=_server_update_running,
